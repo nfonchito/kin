@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:project-k5gcl.vercel.app)",
+      "Bash(npx create-next-app@latest . --typescript --tailwind --eslint --app --no-src-dir --import-alias \"@/*\" --yes)",
+      "PowerShell(node --version)",
+      "PowerShell(npm --version)",
+      "PowerShell($env:PATH = $env:PATH + \";C:\\\\Program Files\\\\nodejs;$env:APPDATA\\\\npm\"; node --version; npm --version)",
+      "mcp__Claude_Preview__preview_start",
+      "PowerShell($regions = @\\(\"us-east-1\",\"us-west-1\",\"us-west-2\",\"eu-west-1\",\"eu-west-2\",\"eu-central-1\",\"ap-southeast-1\",\"ap-northeast-1\"\\); foreach \\($r in $regions\\) { $h = \"aws-0-$r.pooler.supabase.com\"; $res = Resolve-DnsName $h -ErrorAction SilentlyContinue; if \\($res\\) { Write-Host \"FOUND: $h\" } })",
+      "PowerShell(Get-DnsClientServerAddress -AddressFamily IPv4 | Where-Object {$_.ServerAddresses} | Select-Object InterfaceAlias, ServerAddresses; curl.exe -s --max-time 8 \"https://zssyltbskjvaeqxpiipl.supabase.co/auth/v1/health\" 2>&1 | Select-Object -First 3)",
+      "Bash(git init *)",
+      "Bash(git add *)"
+    ]
+  }
+}

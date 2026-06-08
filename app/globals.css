@@ -1,0 +1,74 @@
+@import url('https://fonts.googleapis.com/css2?family=Figtree:ital,wght@0,300..900;1,300..900&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  background-color: #090907;
+  color: #f0efe8;
+  font-family: 'Figtree', sans-serif;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #2a2a27;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #3a3a37;
+}
+
+/* Focus styles */
+:focus-visible {
+  outline: 2px solid rgba(21, 196, 137, 0.5);
+  outline-offset: 2px;
+}
+
+/* Selection */
+::selection {
+  background: rgba(21, 196, 137, 0.2);
+  color: #f0efe8;
+}
+
+@layer components {
+  .input-field {
+    @apply w-full bg-surface-2 border border-border rounded-xl px-3 py-2.5 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-teal/40 transition-colors;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .bg-teal-muted {
+    background-color: rgba(21, 196, 137, 0.12);
+  }
+
+  .bg-teal-subtle {
+    background-color: rgba(21, 196, 137, 0.06);
+  }
+
+  .border-teal-subtle {
+    border-color: rgba(21, 196, 137, 0.2);
+  }
+}
