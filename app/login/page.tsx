@@ -13,10 +13,19 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const isPreview = !process.env.NEXT_PUBLIC_SUPABASE_URL ||
+    process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder");
+
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     setError("");
+
+    // Preview mode — no real auth, just go to dashboard
+    if (isPreview) {
+      router.push("/dashboard");
+      return;
+    }
 
     try {
       const supabase = createClient();

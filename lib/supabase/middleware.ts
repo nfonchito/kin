@@ -8,11 +8,11 @@ export async function updateSession(request: NextRequest) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  // If env vars are not configured, redirect / and /login to /dashboard for preview
+  // If env vars are not configured, send root to /login but let everything else through
   if (!supabaseUrl || !supabaseKey || supabaseUrl.includes("placeholder")) {
-    if (request.nextUrl.pathname === "/" || request.nextUrl.pathname === "/login" || request.nextUrl.pathname === "/signup") {
+    if (request.nextUrl.pathname === "/") {
       const url = request.nextUrl.clone();
-      url.pathname = "/dashboard";
+      url.pathname = "/login";
       return NextResponse.redirect(url);
     }
     return supabaseResponse;
