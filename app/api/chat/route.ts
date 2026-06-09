@@ -1,12 +1,10 @@
-import Anthropic from "@anthropic-ai/sdk";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 
-// ─── Anthropic client ─────────────────────────────────────────────────────────
+// ─── Gemini client ────────────────────────────────────────────────────────────
 
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
+const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY ?? "");
 
 // ─── Task intent detection (for activity logging only) ────────────────────────
 
@@ -84,29 +82,25 @@ export async function POST(req: NextRequest) {
     content: message,
   });
 
-  // Call Claude
+  // Call Gemini (free tier — gemini-1.5-flash)
   let reply: string;
   try {
-    const response = await anthropic.messages.create({
-      model: "claude-opus-4-8",
-      max_tokens: 400,
-      system: systemPrompt,
-      messages: [
-        ...history.map(m => ({
-          role: m.role as "user" | "assistant",
-          content: m.content,
-        })),
-        { role: "user", content: message },
-      ],
+    const model = genAI.getGenerativeModel({
+      model: "gemini-1.5-flash",
+      systemInstruction: systemPrompt,
     });
 
-    const textBlock = response.content.find(b => b.type === "text");
-    reply =
-      textBlock && textBlock.type === "text"
-        ? textBlock.text
-        : "I didn't catch that — could you say it again?";
+    const chat = model.startChat({
+      history: history.map(m => ({
+        role: m.role === "assistant" ? "model" : "user",
+        parts: [{ text: m.content }],
+      })),
+    });
+
+    const result = await chat.sendMessage(message);
+    reply = result.response.text() || "I didn't catch that — could you say it again?";
   } catch (err) {
-    console.error("Anthropic API error:", err);
+    console.error("Gemini API error:", err);
     reply = "I'm having a bit of trouble right now. Please try again in a moment.";
   }
 
