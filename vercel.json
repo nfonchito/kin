@@ -2,5 +2,10 @@
   "framework": "nextjs",
   "buildCommand": "next build",
   "devCommand": "next dev",
-  "installCommand": "npm install --legacy-peer-deps"
+  "installCommand": "npm install --legacy-peer-deps",
+  "build": {
+    "env": {
+      "ESLINT_USE_FLAT_CONFIG": "false"
+    }
+  }
 }
