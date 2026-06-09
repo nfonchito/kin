@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
+import { sendTaskNotification } from "@/lib/email";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -254,7 +255,19 @@ export async function POST(req: NextRequest) {
       preferences: null,
     };
     const intent = detectIntent(message, []);
-    const { reply } = generateResponse(intent, message, ctx);
+    const { reply, activity } = generateResponse(intent, message, ctx);
+
+    // Send email notification for task-type messages
+    if (activity) {
+      void sendTaskNotification({
+        userMessage: message,
+        kinReply: reply,
+        taskTitle: activity.title,
+        taskCategory: activity.category,
+        taskStatus: activity.status,
+      });
+    }
+
     return NextResponse.json({
       reply,
       message: { id: Date.now().toString(), role: "assistant", content: reply, created_at: new Date().toISOString() },
@@ -313,6 +326,14 @@ export async function POST(req: NextRequest) {
       category: activity.category,
       status: activity.status,
       description: message,
+    });
+
+    void sendTaskNotification({
+      userMessage: message,
+      kinReply: reply,
+      taskTitle: activity.title,
+      taskCategory: activity.category,
+      taskStatus: activity.status,
     });
   }
 
