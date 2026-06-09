@@ -3,35 +3,24 @@ import { redirect } from "next/navigation";
 import { Sidebar } from "@/components/Sidebar";
 import { MobileNav } from "@/components/MobileNav";
 
-const IS_PREVIEW = !process.env.NEXT_PUBLIC_SUPABASE_URL ||
-  process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder");
-
-const PREVIEW_FAMILY = { id: "preview", name: "The Johnson Family", neighborhood: "Northwest Hills" };
-
 export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  let family = IS_PREVIEW ? PREVIEW_FAMILY : null;
-  let userEmail = IS_PREVIEW ? "preview@kin.app" : "";
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
 
-  if (!IS_PREVIEW) {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-      redirect("/login");
-    }
-
-    userEmail = user.email ?? "";
-    const { data: familyData } = await supabase
-      .from("families")
-      .select("*")
-      .eq("user_id", user.id)
-      .single();
-    family = familyData;
+  if (!user) {
+    redirect("/login");
   }
+
+  const userEmail = user.email ?? "";
+  const { data: family } = await supabase
+    .from("families")
+    .select("*")
+    .eq("user_id", user.id)
+    .single();
 
   return (
     <div className="flex h-screen bg-bg overflow-hidden">
