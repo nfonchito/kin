@@ -1,7 +1,22 @@
 import { createClient } from "@/lib/supabase/server";
 import { CalendarView } from "@/components/CalendarView";
 
+const IS_PREVIEW = !process.env.NEXT_PUBLIC_SUPABASE_URL ||
+  process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder");
+
 export default async function CalendarPage() {
+  if (IS_PREVIEW) {
+    return (
+      <div className="px-5 py-6">
+        <div className="mb-6">
+          <h1 className="text-xl font-semibold text-text-primary">Calendar</h1>
+          <p className="text-sm text-text-secondary mt-0.5">Upcoming events and bookings</p>
+        </div>
+        <CalendarView events={[]} familyId="preview" />
+      </div>
+    );
+  }
+
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;

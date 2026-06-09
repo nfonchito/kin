@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { LayoutDashboard, Calendar, User, LogOut } from "lucide-react";
 import { KinLogo } from "./KinLogo";
 import { createClient } from "@/lib/supabase/client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 const nav = [
   { href: "/dashboard", label: "Home", icon: LayoutDashboard },
@@ -22,6 +22,16 @@ export function MobileNav({ family }: MobileNavProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [signingOut, setSigningOut] = useState(false);
+  const [localName, setLocalName] = useState(family?.name || "");
+
+  useEffect(() => {
+    if (!family?.name) {
+      const stored = localStorage.getItem("kin_family_name");
+      if (stored) setLocalName(stored);
+    }
+  }, [family?.name]);
+
+  const displayName = family?.name || localName || "";
 
   async function handleSignOut() {
     setSigningOut(true);
@@ -37,7 +47,7 @@ export function MobileNav({ family }: MobileNavProps) {
       <header className="lg:hidden flex items-center justify-between px-4 py-3 border-b border-border bg-surface sticky top-0 z-20">
         <KinLogo size={26} showWordmark />
         <div className="flex items-center gap-2">
-          <span className="text-xs text-text-muted">{family?.name}</span>
+          {displayName && <span className="text-xs text-text-muted">{displayName}</span>}
           <button
             onClick={handleSignOut}
             disabled={signingOut}

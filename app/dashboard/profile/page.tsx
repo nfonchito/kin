@@ -1,7 +1,28 @@
 import { createClient } from "@/lib/supabase/server";
 import { ProfileForm } from "@/components/ProfileForm";
 
+const IS_PREVIEW = !process.env.NEXT_PUBLIC_SUPABASE_URL ||
+  process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder");
+
 export default async function ProfilePage() {
+  if (IS_PREVIEW) {
+    return (
+      <div className="px-5 py-6 max-w-2xl">
+        <div className="mb-6">
+          <h1 className="text-xl font-semibold text-text-primary">Family Profile</h1>
+          <p className="text-sm text-text-secondary mt-0.5">Your family details and preferences</p>
+        </div>
+        <ProfileForm
+          family={null}
+          members={[]}
+          preferences={null}
+          userEmail=""
+          isPreview
+        />
+      </div>
+    );
+  }
+
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;

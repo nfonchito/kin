@@ -240,13 +240,30 @@ function generateResponse(
 // ─── Route handler ────────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
   const { message, familyId } = await req.json();
   if (!message || !familyId)
     return NextResponse.json({ error: "Missing message or familyId" }, { status: 400 });
+
+  // Preview mode — no Supabase, use stored name from request if provided
+  if (familyId === "preview") {
+    const ctx: FamilyContext = {
+      name: "your family",
+      neighborhood: "your neighborhood",
+      city: "Austin", state: "TX", zip: "",
+      members: [],
+      preferences: null,
+    };
+    const intent = detectIntent(message, []);
+    const { reply } = generateResponse(intent, message, ctx);
+    return NextResponse.json({
+      reply,
+      message: { id: Date.now().toString(), role: "assistant", content: reply, created_at: new Date().toISOString() },
+    });
+  }
+
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   // Load family context
   const [{ data: family }, { data: members }, { data: preferences }, { data: recentMessages }] =

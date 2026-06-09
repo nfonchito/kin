@@ -3,11 +3,26 @@ import { redirect } from "next/navigation";
 import { Sidebar } from "@/components/Sidebar";
 import { MobileNav } from "@/components/MobileNav";
 
+const IS_PREVIEW = !process.env.NEXT_PUBLIC_SUPABASE_URL ||
+  process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder");
+
 export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  if (IS_PREVIEW) {
+    return (
+      <div className="flex h-screen bg-bg overflow-hidden">
+        <Sidebar family={null} userEmail="" />
+        <main className="flex-1 overflow-auto lg:ml-0">
+          <MobileNav family={null} userEmail="" />
+          <div className="min-h-full">{children}</div>
+        </main>
+      </div>
+    );
+  }
+
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
@@ -25,12 +40,9 @@ export default async function DashboardLayout({
   return (
     <div className="flex h-screen bg-bg overflow-hidden">
       <Sidebar family={family} userEmail={userEmail} />
-
       <main className="flex-1 overflow-auto lg:ml-0">
         <MobileNav family={family} userEmail={userEmail} />
-        <div className="min-h-full">
-          {children}
-        </div>
+        <div className="min-h-full">{children}</div>
       </main>
     </div>
   );

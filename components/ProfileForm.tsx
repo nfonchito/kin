@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Plus, Trash2, User, Home, Settings2 } from "lucide-react";
 
 interface Family {
@@ -31,16 +31,40 @@ interface ProfileFormProps {
   members: Member[];
   preferences: Preferences | null;
   userEmail: string;
+  isPreview?: boolean;
 }
 
 const MEMBER_COLORS = [
   "#15c489", "#6366f1", "#f59e0b", "#ec4899", "#8b5cf6", "#14b8a6"
 ];
 
-export function ProfileForm({ family, members: initialMembers, preferences: initialPrefs, userEmail }: ProfileFormProps) {
+export function ProfileForm({ family, members: initialMembers, preferences: initialPrefs, userEmail, isPreview }: ProfileFormProps) {
   const [familyName, setFamilyName] = useState(family?.name ?? "");
-  const [neighborhood, setNeighborhood] = useState(family?.neighborhood ?? "Northwest Hills");
+  const [neighborhood, setNeighborhood] = useState(family?.neighborhood ?? "");
   const [members, setMembers] = useState<Member[]>(initialMembers);
+
+  // In preview mode, load from localStorage on mount
+  useEffect(() => {
+    if (!isPreview) return;
+    const storedName = localStorage.getItem("kin_family_name");
+    const storedNeighborhood = localStorage.getItem("kin_neighborhood");
+    const storedMembers = localStorage.getItem("kin_members");
+    if (storedName) setFamilyName(storedName);
+    if (storedNeighborhood) setNeighborhood(storedNeighborhood);
+    if (storedMembers) {
+      try { setMembers(JSON.parse(storedMembers)); } catch {}
+    }
+    const storedPrefs = localStorage.getItem("kin_prefs");
+    if (storedPrefs) {
+      try {
+        const p = JSON.parse(storedPrefs);
+        if (p.home_size !== undefined) setHomeSize(p.home_size);
+        if (p.yard_type !== undefined) setYardType(p.yard_type);
+        if (p.dietary_notes !== undefined) setDietaryNotes(p.dietary_notes);
+        if (p.reminders_enabled !== undefined) setReminders(p.reminders_enabled);
+      } catch {}
+    }
+  }, [isPreview]);
   const [homeSize, setHomeSize] = useState(initialPrefs?.home_size ?? "");
   const [yardType, setYardType] = useState(initialPrefs?.yard_type ?? "");
   const [dietaryNotes, setDietaryNotes] = useState(initialPrefs?.dietary_notes ?? "");
@@ -57,11 +81,16 @@ export function ProfileForm({ family, members: initialMembers, preferences: init
 
   async function saveFamily() {
     setSavingFamily(true);
-    await fetch("/api/profile", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ type: "family", name: familyName, neighborhood }),
-    });
+    if (isPreview) {
+      localStorage.setItem("kin_family_name", familyName);
+      localStorage.setItem("kin_neighborhood", neighborhood);
+    } else {
+      await fetch("/api/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "family", name: familyName, neighborhood }),
+      });
+    }
     setSavingFamily(false);
     setSaved("family");
     setTimeout(() => setSaved(null), 2000);
@@ -69,17 +98,21 @@ export function ProfileForm({ family, members: initialMembers, preferences: init
 
   async function savePreferences() {
     setSavingPrefs(true);
-    await fetch("/api/profile", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        type: "preferences",
-        home_size: homeSize,
-        yard_type: yardType,
-        dietary_notes: dietaryNotes,
-        reminders_enabled: reminders,
-      }),
-    });
+    if (isPreview) {
+      localStorage.setItem("kin_prefs", JSON.stringify({ home_size: homeSize, yard_type: yardType, dietary_notes: dietaryNotes, reminders_enabled: reminders }));
+    } else {
+      await fetch("/api/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "preferences",
+          home_size: homeSize,
+          yard_type: yardType,
+          dietary_notes: dietaryNotes,
+          reminders_enabled: reminders,
+        }),
+      });
+    }
     setSavingPrefs(false);
     setSaved("prefs");
     setTimeout(() => setSaved(null), 2000);
@@ -87,18 +120,30 @@ export function ProfileForm({ family, members: initialMembers, preferences: init
 
   async function addMember() {
     if (!newMemberName) return;
-    const res = await fetch("/api/profile", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        type: "member",
+    if (isPreview) {
+      const member: Member = {
+        id: Date.now().toString(),
         name: newMemberName,
         role: newMemberRole,
-        age: newMemberAge ? parseInt(newMemberAge) : null,
-      }),
-    });
-    const member = await res.json();
-    setMembers((prev) => [...prev, member]);
+        age: newMemberAge ? parseInt(newMemberAge) : undefined,
+      };
+      const updated = [...members, member];
+      setMembers(updated);
+      localStorage.setItem("kin_members", JSON.stringify(updated));
+    } else {
+      const res = await fetch("/api/profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "member",
+          name: newMemberName,
+          role: newMemberRole,
+          age: newMemberAge ? parseInt(newMemberAge) : null,
+        }),
+      });
+      const member = await res.json();
+      setMembers((prev) => [...prev, member]);
+    }
     setNewMemberName("");
     setNewMemberRole("member");
     setNewMemberAge("");
@@ -106,12 +151,18 @@ export function ProfileForm({ family, members: initialMembers, preferences: init
   }
 
   async function removeMember(id: string) {
-    await fetch("/api/profile", {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, type: "member" }),
-    });
-    setMembers((prev) => prev.filter((m) => m.id !== id));
+    if (isPreview) {
+      const updated = members.filter((m) => m.id !== id);
+      setMembers(updated);
+      localStorage.setItem("kin_members", JSON.stringify(updated));
+    } else {
+      await fetch("/api/profile", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, type: "member" }),
+      });
+      setMembers((prev) => prev.filter((m) => m.id !== id));
+    }
   }
 
   return (
@@ -139,10 +190,12 @@ export function ProfileForm({ family, members: initialMembers, preferences: init
               placeholder="Northwest Hills"
             />
           </div>
-          <div>
-            <label className="block text-xs text-text-secondary mb-1">Account email</label>
-            <p className="text-sm text-text-muted">{userEmail}</p>
-          </div>
+          {userEmail && (
+            <div>
+              <label className="block text-xs text-text-secondary mb-1">Account email</label>
+              <p className="text-sm text-text-muted">{userEmail}</p>
+            </div>
+          )}
           <SaveButton
             onClick={saveFamily}
             loading={savingFamily}

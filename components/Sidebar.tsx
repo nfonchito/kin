@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { LayoutDashboard, Calendar, User, LogOut } from "lucide-react";
 import { KinLogo } from "./KinLogo";
 import { createClient } from "@/lib/supabase/client";
@@ -20,6 +21,20 @@ interface SidebarProps {
 export function Sidebar({ family, userEmail }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
+  const [localName, setLocalName] = useState(family?.name || "");
+  const [localNeighborhood, setLocalNeighborhood] = useState("");
+
+  useEffect(() => {
+    if (!family?.name) {
+      const stored = localStorage.getItem("kin_family_name");
+      if (stored) setLocalName(stored);
+    }
+    const storedNeighborhood = localStorage.getItem("kin_neighborhood");
+    if (storedNeighborhood) setLocalNeighborhood(storedNeighborhood);
+  }, [family?.name]);
+
+  const displayName = family?.name || localName || "My Family";
+  const displayNeighborhood = family?.neighborhood || localNeighborhood || "";
 
   async function handleSignOut() {
     const supabase = createClient();
@@ -39,9 +54,11 @@ export function Sidebar({ family, userEmail }: SidebarProps) {
       <div className="px-4 py-3 border-b border-border">
         <p className="text-xs text-text-muted uppercase tracking-wider mb-0.5">Family</p>
         <p className="text-sm font-medium text-text-primary truncate">
-          {family?.name ?? "My Family"}
+          {displayName}
         </p>
-        <p className="text-xs text-text-muted mt-0.5">Northwest Hills · 78731</p>
+        {displayNeighborhood && (
+          <p className="text-xs text-text-muted mt-0.5">{displayNeighborhood}</p>
+        )}
       </div>
 
       {/* Nav */}
