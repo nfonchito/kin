@@ -58,6 +58,15 @@ export function ChatInterface({ familyId, initialMessages }: ChatInterfaceProps)
 
       const data = await res.json();
 
+      // Persist calendar event to localStorage in preview mode
+      if (data.event && familyId === "preview") {
+        try {
+          const stored: unknown[] = JSON.parse(localStorage.getItem("kin_calendar_events") || "[]");
+          stored.push(data.event);
+          localStorage.setItem("kin_calendar_events", JSON.stringify(stored));
+        } catch {}
+      }
+
       const assistantMsg: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",

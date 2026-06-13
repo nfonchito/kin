@@ -34,6 +34,79 @@ function extractDay(msg: string): string | null {
   return m ? m[1] : null;
 }
 
+function extractTime(msg: string): string {
+  const m = msg.match(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/i);
+  if (!m) return "09:00";
+  let h = parseInt(m[1]);
+  const min = m[2] ? parseInt(m[2]) : 0;
+  if (m[3].toLowerCase() === "pm" && h !== 12) h += 12;
+  if (m[3].toLowerCase() === "am" && h === 12) h = 0;
+  return `${String(h).padStart(2, "0")}:${String(min).padStart(2, "0")}`;
+}
+
+function resolveDate(dayStr: string, timeStr = "09:00"): string | null {
+  const now = new Date();
+  const lower = dayStr.toLowerCase();
+  if (lower === "this week" || lower === "next week") return null;
+  const [hh, mm] = timeStr.split(":").map(Number);
+  let d = new Date(now);
+  if (lower === "tomorrow") {
+    d.setDate(d.getDate() + 1);
+  } else if (lower !== "today") {
+    const days = ["sunday","monday","tuesday","wednesday","thursday","friday","saturday"];
+    const target = days.indexOf(lower);
+    if (target === -1) return null;
+    let ahead = target - d.getDay();
+    if (ahead <= 0) ahead += 7;
+    d.setDate(d.getDate() + ahead);
+  }
+  d.setHours(hh, mm, 0, 0);
+  return d.toISOString();
+}
+
+const CAL_CATEGORY: Record<string, string> = {
+  lawn: "service",
+  booking: "appointment",
+  errand: "general",
+  reminder: "general",
+  general: "general",
+};
+
+const CAL_COLOR: Record<string, string> = {
+  appointment: "#ec4899",
+  service: "#15c489",
+  sports: "#f59e0b",
+  school: "#6366f1",
+  social: "#8b5cf6",
+  general: "#6b7280",
+};
+
+interface CalEvent {
+  id: string;
+  title: string;
+  start_time: string;
+  category: string;
+  color: string;
+}
+
+function buildCalendarEvent(
+  activity: { title: string; category: string },
+  msg: string
+): CalEvent | null {
+  const day = extractDay(msg);
+  if (!day) return null;
+  const start_time = resolveDate(day, extractTime(msg));
+  if (!start_time) return null;
+  const category = CAL_CATEGORY[activity.category] ?? "general";
+  return {
+    id: `${Date.now()}`,
+    title: activity.title,
+    start_time,
+    category,
+    color: CAL_COLOR[category] ?? "#6b7280",
+  };
+}
+
 // ─── Intent detection ─────────────────────────────────────────────────────────
 
 function detectIntent(msg: string, history: Message[]): string {
@@ -245,7 +318,7 @@ export async function POST(req: NextRequest) {
   if (!message || !familyId)
     return NextResponse.json({ error: "Missing message or familyId" }, { status: 400 });
 
-  // Preview mode — no Supabase, use stored name from request if provided
+  // Preview mode — no Supabase
   if (familyId === "preview") {
     const ctx: FamilyContext = {
       name: "your family",
@@ -256,12 +329,13 @@ export async function POST(req: NextRequest) {
     };
     const intent = detectIntent(message, []);
     const { reply, activity } = generateResponse(intent, message, ctx);
+    const calEvent = activity ? buildCalendarEvent(activity, message) : null;
+    const finalReply = calEvent ? `${reply} I've added it to your calendar.` : reply;
 
-    // Send email notification for task-type messages
     if (activity) {
       void sendTaskNotification({
         userMessage: message,
-        kinReply: reply,
+        kinReply: finalReply,
         taskTitle: activity.title,
         taskCategory: activity.category,
         taskStatus: activity.status,
@@ -269,8 +343,9 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({
-      reply,
-      message: { id: Date.now().toString(), role: "assistant", content: reply, created_at: new Date().toISOString() },
+      reply: finalReply,
+      message: { id: Date.now().toString(), role: "assistant", content: finalReply, created_at: new Date().toISOString() },
+      ...(calEvent ? { event: calEvent } : {}),
     });
   }
 
@@ -310,11 +385,13 @@ export async function POST(req: NextRequest) {
   // Generate response
   const intent = detectIntent(message, history);
   const { reply, activity } = generateResponse(intent, message, ctx);
+  const calEvent = activity ? buildCalendarEvent(activity, message) : null;
+  const finalReply = calEvent ? `${reply} I've added it to your calendar.` : reply;
 
   // Save assistant message
   const { data: assistantMsg } = await supabase
     .from("messages")
-    .insert({ family_id: familyId, role: "assistant", content: reply })
+    .insert({ family_id: familyId, role: "assistant", content: finalReply })
     .select()
     .single();
 
@@ -330,12 +407,23 @@ export async function POST(req: NextRequest) {
 
     void sendTaskNotification({
       userMessage: message,
-      kinReply: reply,
+      kinReply: finalReply,
       taskTitle: activity.title,
       taskCategory: activity.category,
       taskStatus: activity.status,
     });
   }
 
-  return NextResponse.json({ reply, message: assistantMsg });
+  // Create calendar event when a specific day was mentioned
+  if (calEvent) {
+    await supabase.from("events").insert({
+      family_id: familyId,
+      title: calEvent.title,
+      start_time: calEvent.start_time,
+      category: calEvent.category,
+      color: calEvent.color,
+    });
+  }
+
+  return NextResponse.json({ reply: finalReply, message: assistantMsg, ...(calEvent ? { event: calEvent } : {}) });
 }
