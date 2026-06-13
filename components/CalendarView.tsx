@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   format,
   startOfMonth,
@@ -38,10 +38,21 @@ interface CalendarViewProps {
   familyId: string | undefined;
 }
 
+const PREVIEW_KEY = "kin_calendar_events";
+const isPreview = (id: string | undefined) => id === "preview";
+
 export function CalendarView({ events: initialEvents, familyId }: CalendarViewProps) {
   const [current, setCurrent] = useState(new Date());
   const [events, setEvents] = useState<CalEvent[]>(initialEvents);
   const [selected, setSelected] = useState<Date | null>(null);
+
+  useEffect(() => {
+    if (!isPreview(familyId)) return;
+    try {
+      const stored = localStorage.getItem(PREVIEW_KEY);
+      if (stored) setEvents(JSON.parse(stored));
+    } catch {}
+  }, [familyId]);
   const [showForm, setShowForm] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [newTime, setNewTime] = useState("09:00");
@@ -72,20 +83,35 @@ export function CalendarView({ events: initialEvents, familyId }: CalendarViewPr
       `${format(selected, "yyyy-MM-dd")}T${newTime}`
     ).toISOString();
 
-    const res = await fetch("/api/events", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        family_id: familyId,
+    if (isPreview(familyId)) {
+      const newEvent: CalEvent = {
+        id: Date.now().toString(),
         title: newTitle,
         start_time,
         category: newCategory,
         color: CATEGORY_COLORS[newCategory],
-      }),
-    });
+      };
+      setEvents((prev) => {
+        const updated = [...prev, newEvent];
+        localStorage.setItem(PREVIEW_KEY, JSON.stringify(updated));
+        return updated;
+      });
+    } else {
+      const res = await fetch("/api/events", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          family_id: familyId,
+          title: newTitle,
+          start_time,
+          category: newCategory,
+          color: CATEGORY_COLORS[newCategory],
+        }),
+      });
+      const data = await res.json();
+      setEvents((prev) => [...prev, data]);
+    }
 
-    const data = await res.json();
-    setEvents((prev) => [...prev, data]);
     setNewTitle("");
     setNewTime("09:00");
     setShowForm(false);
@@ -93,12 +119,20 @@ export function CalendarView({ events: initialEvents, familyId }: CalendarViewPr
   }
 
   async function removeEvent(id: string) {
-    await fetch("/api/events", {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id }),
-    });
-    setEvents((prev) => prev.filter((e) => e.id !== id));
+    if (isPreview(familyId)) {
+      setEvents((prev) => {
+        const updated = prev.filter((e) => e.id !== id);
+        localStorage.setItem(PREVIEW_KEY, JSON.stringify(updated));
+        return updated;
+      });
+    } else {
+      await fetch("/api/events", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      setEvents((prev) => prev.filter((e) => e.id !== id));
+    }
   }
 
   const selectedDayEvents = selected ? eventsOnDay(selected) : [];
