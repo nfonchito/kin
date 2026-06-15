@@ -89,6 +89,26 @@ interface CalEvent {
   color: string;
 }
 
+function extractEventTitle(msg: string): string {
+  const cleaned = msg
+    .replace(/\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow|today)\b/gi, "")
+    .replace(/\b\d{1,2}(?::\d{2})?\s*(?:am|pm)\b/gi, "")
+    .replace(/\b(add|put|create|log|note|set|book|on|for|at|is|has|have|a|an|the)\b/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return cleaned || msg.slice(0, 60);
+}
+
+function inferCalCategory(title: string): string {
+  const t = title.toLowerCase();
+  if (/doctor|dentist|appointment|appt|vet|therapy|checkup|physical/.test(t)) return "appointment";
+  if (/soccer|practice|game|sport|gym|workout|tennis|swim|dance|cheer|baseball|basketball/.test(t)) return "sports";
+  if (/school|class|teacher|homework|exam|test|conference|tutor|recital|play/.test(t)) return "school";
+  if (/party|date|birthday|brunch|lunch|concert|movie|social|show/.test(t)) return "social";
+  if (/lawn|clean|plumb|repair|service|maintenance|pool|pest|handyman/.test(t)) return "service";
+  return "general";
+}
+
 function buildCalendarEvent(
   activity: { title: string; category: string },
   msg: string
@@ -97,7 +117,7 @@ function buildCalendarEvent(
   if (!day) return null;
   const start_time = resolveDate(day, extractTime(msg));
   if (!start_time) return null;
-  const category = CAL_CATEGORY[activity.category] ?? "general";
+  const category = inferCalCategory(activity.title) || CAL_CATEGORY[activity.category] || "general";
   return {
     id: `${Date.now()}`,
     title: activity.title,
@@ -149,7 +169,9 @@ function detectIntent(msg: string, history: Message[]): string {
   if (/remind|reminder|don'?t (let|forget)|heads[ -]?up/.test(lower)) return "task_reminder";
   if (/clean(ing|er)?|housekeeper|maid|tidy/.test(lower)) return "task_cleaning";
   if (/grocery|groceries|shopping list|food (run|pickup)|meal prep/.test(lower)) return "task_grocery";
-  if (/(book|schedule|make|set up).{0,20}(appointment|appt|dentist|doctor|dr\.|vet|hair|nail)/.test(lower)) return "task_appointment";
+  if (/\b(book|schedule|make|set up|add|create|need|get|put)\b.{0,30}\b(appointment|appt|dentist|doctor|dr\.|vet|hair|nail|therapy)\b/.test(lower) ||
+      /\b(appointment|appt|dentist|doctor|vet)\b/.test(lower))
+    return "task_appointment";
   if (/pick(ing)? up|drop(ping)? off|carpool|drive|uber/.test(lower)) return "task_transport";
   if (/dinner|cook|recipe|restaurant|reserv/.test(lower)) return "task_dinner";
   if (/pool|pest|repair|fix|plumb|electr|handyman|hvac|ac |a\/c/.test(lower)) return "task_home_service";
@@ -158,6 +180,11 @@ function detectIntent(msg: string, history: Message[]): string {
   if (recent.includes("lawn") || recent.includes("mow")) return "task_lawn_followup";
   if (recent.includes("remind")) return "task_reminder_followup";
   if (recent.includes("clean")) return "task_cleaning_followup";
+
+  // Generic calendar event — any message with a specific day + event/action keyword
+  if (/\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow|today)\b/.test(lower) &&
+      /\b(add|put|create|schedule|book|have|has|is|practice|game|party|birthday|class|meeting|event|recital|concert|lunch|brunch|date|flight|trip|show|play)\b/.test(lower))
+    return "add_to_calendar";
 
   return "general";
 }
@@ -298,6 +325,14 @@ function generateResponse(
         reply: `I'll find a reliable vendor in ${ctx.neighborhood} for that. ${day ? `Aiming for ${day}.` : "When works for you?"} Any history with this issue I should know about?`,
         activity: { title: msg.slice(0, 60), category: "general", status: "in_progress" },
       };
+
+    case "add_to_calendar": {
+      const title = extractEventTitle(msg);
+      return {
+        reply: `Got it — I've added "${title}" to your calendar${day ? ` for ${day}` : ""}.`,
+        activity: { title, category: "general", status: "done" },
+      };
+    }
 
     default:
       return {
