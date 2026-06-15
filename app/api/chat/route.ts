@@ -35,6 +35,9 @@ function extractDay(msg: string): string | null {
 }
 
 function extractTime(msg: string): string {
+  const lower = msg.toLowerCase();
+  if (/\bnoon\b/.test(lower)) return "12:00";
+  if (/\bmidnight\b/.test(lower)) return "00:00";
   const m = msg.match(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/i);
   if (!m) return "09:00";
   let h = parseInt(m[1]);
@@ -44,24 +47,76 @@ function extractTime(msg: string): string {
   return `${String(h).padStart(2, "0")}:${String(min).padStart(2, "0")}`;
 }
 
-function resolveDate(dayStr: string, timeStr = "09:00"): string | null {
+const MONTHS_ABBR = ["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"];
+
+// Parse any date reference in a freeform message into an ISO datetime, or null.
+function extractDateISO(msg: string): string | null {
+  const lower = msg.toLowerCase();
+  const [hh, mm] = extractTime(msg).split(":").map(Number);
   const now = new Date();
-  const lower = dayStr.toLowerCase();
-  if (lower === "this week" || lower === "next week") return null;
-  const [hh, mm] = timeStr.split(":").map(Number);
-  let d = new Date(now);
-  if (lower === "tomorrow") {
-    d.setDate(d.getDate() + 1);
-  } else if (lower !== "today") {
-    const days = ["sunday","monday","tuesday","wednesday","thursday","friday","saturday"];
-    const target = days.indexOf(lower);
-    if (target === -1) return null;
-    let ahead = target - d.getDay();
+  const at = (d: Date) => { d.setHours(hh, mm, 0, 0); return d.toISOString(); };
+
+  if (/\btomorrow\b/.test(lower)) { const d = new Date(now); d.setDate(d.getDate() + 1); return at(d); }
+  if (/\b(today|tonight)\b/.test(lower)) return at(new Date(now));
+
+  // Weekday (optionally preceded by "next")
+  const days = ["sunday","monday","tuesday","wednesday","thursday","friday","saturday"];
+  const wd = lower.match(/\b(next\s+)?(sunday|monday|tuesday|wednesday|thursday|friday|saturday)\b/);
+  if (wd) {
+    const d = new Date(now);
+    let ahead = days.indexOf(wd[2]) - d.getDay();
     if (ahead <= 0) ahead += 7;
     d.setDate(d.getDate() + ahead);
+    return at(d);
   }
-  d.setHours(hh, mm, 0, 0);
-  return d.toISOString();
+
+  // "next week" → next Monday
+  if (/\bnext week\b/.test(lower)) {
+    const d = new Date(now);
+    let ahead = 1 - d.getDay(); if (ahead <= 0) ahead += 7; ahead += 7;
+    d.setDate(d.getDate() + ahead); return at(d);
+  }
+
+  // Month name + day  ("june 22", "jun 22nd", "sept 3")
+  const mn = lower.match(/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\.?\s+(\d{1,2})(?:st|nd|rd|th)?\b/);
+  if (mn) {
+    const mi = MONTHS_ABBR.indexOf(mn[1].slice(0, 3));
+    const day = parseInt(mn[2]);
+    if (mi >= 0 && day >= 1 && day <= 31) {
+      let d = new Date(now.getFullYear(), mi, day, hh, mm, 0, 0);
+      if (d < now) d = new Date(now.getFullYear() + 1, mi, day, hh, mm, 0, 0);
+      return d.toISOString();
+    }
+  }
+
+  // Numeric M/D or M/D/Y  ("6/22", "06/22/2026")
+  const num = lower.match(/\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/);
+  if (num) {
+    const mi = parseInt(num[1]) - 1, day = parseInt(num[2]);
+    const year = num[3] ? (num[3].length === 2 ? 2000 + parseInt(num[3]) : parseInt(num[3])) : now.getFullYear();
+    if (mi >= 0 && mi <= 11 && day >= 1 && day <= 31) {
+      let d = new Date(year, mi, day, hh, mm, 0, 0);
+      if (!num[3] && d < now) d = new Date(year + 1, mi, day, hh, mm, 0, 0);
+      return d.toISOString();
+    }
+  }
+
+  // Day-of-month ordinal  ("the 20th", "on the 3rd", "22nd")
+  const dom = lower.match(/\b(?:on\s+)?(?:the\s+)?(\d{1,2})(?:st|nd|rd|th)\b/);
+  if (dom) {
+    const day = parseInt(dom[1]);
+    if (day >= 1 && day <= 31) {
+      let d = new Date(now.getFullYear(), now.getMonth(), day, hh, mm, 0, 0);
+      if (d < now) d = new Date(now.getFullYear(), now.getMonth() + 1, day, hh, mm, 0, 0);
+      return d.toISOString();
+    }
+  }
+
+  return null;
+}
+
+function hasDateLike(msg: string): boolean {
+  return extractDateISO(msg) !== null;
 }
 
 const CAL_CATEGORY: Record<string, string> = {
@@ -113,9 +168,7 @@ function buildCalendarEvent(
   activity: { title: string; category: string },
   msg: string
 ): CalEvent | null {
-  const day = extractDay(msg);
-  if (!day) return null;
-  const start_time = resolveDate(day, extractTime(msg));
+  const start_time = extractDateISO(msg);
   if (!start_time) return null;
   const category = inferCalCategory(activity.title) || CAL_CATEGORY[activity.category] || "general";
   return {
@@ -181,9 +234,10 @@ function detectIntent(msg: string, history: Message[]): string {
   if (recent.includes("remind")) return "task_reminder_followup";
   if (recent.includes("clean")) return "task_cleaning_followup";
 
-  // Generic calendar event — any message with a specific day + event/action keyword
-  if (/\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow|today)\b/.test(lower) &&
-      /\b(add|put|create|schedule|book|have|has|is|practice|game|party|birthday|class|meeting|event|recital|concert|lunch|brunch|date|flight|trip|show|play)\b/.test(lower))
+  // Generic calendar event — any message that references a date/day.
+  // Questions, greetings, and thanks are matched and returned above, so
+  // by here a date reference almost always means "put this on my calendar".
+  if (hasDateLike(msg))
     return "add_to_calendar";
 
   return "general";
@@ -329,7 +383,7 @@ function generateResponse(
     case "add_to_calendar": {
       const title = extractEventTitle(msg);
       return {
-        reply: `Got it — I've added "${title}" to your calendar${day ? ` for ${day}` : ""}.`,
+        reply: `Got it — "${title}" is set.`,
         activity: { title, category: "general", status: "done" },
       };
     }

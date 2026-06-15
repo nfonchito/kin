@@ -35,6 +35,24 @@ export function ChatInterface({ familyId, initialMessages }: ChatInterfaceProps)
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  // Preview mode: restore the conversation on mount so it survives navigation
+  useEffect(() => {
+    if (familyId !== "preview") return;
+    try {
+      const saved = localStorage.getItem("kin_chat_messages");
+      if (saved) setMessages(JSON.parse(saved));
+    } catch {}
+  }, [familyId]);
+
+  // Preview mode: persist on every change (skip the initial empty state so we
+  // never overwrite a saved conversation before it has been restored)
+  useEffect(() => {
+    if (familyId !== "preview" || messages.length === 0) return;
+    try {
+      localStorage.setItem("kin_chat_messages", JSON.stringify(messages));
+    } catch {}
+  }, [messages, familyId]);
+
   async function sendMessage(text: string) {
     if (!text.trim() || !familyId || loading) return;
 

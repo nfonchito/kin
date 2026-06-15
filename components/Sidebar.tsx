@@ -14,7 +14,7 @@ const nav = [
 ];
 
 interface SidebarProps {
-  family: { name: string } | null;
+  family: { name: string; neighborhood?: string } | null;
   userEmail: string;
 }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { format, isToday, isTomorrow } from "date-fns";
 import { CalendarDays, Plus, X } from "lucide-react";
 
@@ -34,6 +34,11 @@ const CATEGORY_COLORS: Record<string, string> = {
   general: "#6b7280",
 };
 
+const PREVIEW_KEY = "kin_calendar_events";
+const isPreview = (id: string | undefined) => id === "preview";
+const byStart = (a: Event, b: Event) =>
+  new Date(a.start_time).getTime() - new Date(b.start_time).getTime();
+
 export function UpcomingEvents({ events: initialEvents, familyId }: UpcomingEventsProps) {
   const [events, setEvents] = useState<Event[]>(initialEvents);
   const [showForm, setShowForm] = useState(false);
@@ -42,6 +47,22 @@ export function UpcomingEvents({ events: initialEvents, familyId }: UpcomingEven
   const [newTime, setNewTime] = useState("");
   const [newCategory, setNewCategory] = useState("general");
   const [saving, setSaving] = useState(false);
+
+  // Preview mode: read the shared calendar store so AI- and calendar-created
+  // events show up here too. Show today onward, soonest first.
+  useEffect(() => {
+    if (!isPreview(familyId)) return;
+    try {
+      const stored = localStorage.getItem(PREVIEW_KEY);
+      if (!stored) return;
+      const all: Event[] = JSON.parse(stored);
+      const startOfToday = new Date(); startOfToday.setHours(0, 0, 0, 0);
+      setEvents(
+        all.filter((e) => new Date(e.start_time).getTime() >= startOfToday.getTime())
+           .sort(byStart)
+      );
+    } catch {}
+  }, [familyId]);
 
   async function addEvent(e: React.FormEvent) {
     e.preventDefault();
@@ -52,22 +73,36 @@ export function UpcomingEvents({ events: initialEvents, familyId }: UpcomingEven
       ? new Date(`${newDate}T${newTime}`).toISOString()
       : new Date(`${newDate}T09:00`).toISOString();
 
-    const res = await fetch("/api/events", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        family_id: familyId,
+    if (isPreview(familyId)) {
+      const newEvent: Event = {
+        id: Date.now().toString(),
         title: newTitle,
         start_time,
         category: newCategory,
         color: CATEGORY_COLORS[newCategory],
-      }),
-    });
+      };
+      try {
+        const all: Event[] = JSON.parse(localStorage.getItem(PREVIEW_KEY) || "[]");
+        all.push(newEvent);
+        localStorage.setItem(PREVIEW_KEY, JSON.stringify(all));
+      } catch {}
+      setEvents((prev) => [...prev, newEvent].sort(byStart));
+    } else {
+      const res = await fetch("/api/events", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          family_id: familyId,
+          title: newTitle,
+          start_time,
+          category: newCategory,
+          color: CATEGORY_COLORS[newCategory],
+        }),
+      });
+      const data = await res.json();
+      setEvents((prev) => [...prev, data].sort(byStart));
+    }
 
-    const data = await res.json();
-    setEvents((prev) => [...prev, data].sort((a, b) =>
-      new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
-    ));
     setNewTitle("");
     setNewDate("");
     setNewTime("");
@@ -76,12 +111,20 @@ export function UpcomingEvents({ events: initialEvents, familyId }: UpcomingEven
   }
 
   async function removeEvent(id: string) {
-    await fetch("/api/events", {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id }),
-    });
-    setEvents((prev) => prev.filter((e) => e.id !== id));
+    if (isPreview(familyId)) {
+      try {
+        const all: Event[] = JSON.parse(localStorage.getItem(PREVIEW_KEY) || "[]");
+        localStorage.setItem(PREVIEW_KEY, JSON.stringify(all.filter((e) => e.id !== id)));
+      } catch {}
+      setEvents((prev) => prev.filter((e) => e.id !== id));
+    } else {
+      await fetch("/api/events", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      setEvents((prev) => prev.filter((e) => e.id !== id));
+    }
   }
 
   return (
