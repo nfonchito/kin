@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { LegalPage } from "@/components/LegalPage";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy — Kin",
+  title: "Privacy Policy",
   description: "How Kin collects, uses, and protects your family's information.",
 };
 
