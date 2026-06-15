@@ -152,10 +152,10 @@ interface CalEvent {
 }
 
 function extractEventTitle(msg: string): string {
-  const cleaned = msg
-    .replace(/\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow|today)\b/gi, "")
-    .replace(/\b\d{1,2}(?::\d{2})?\s*(?:am|pm)\b/gi, "")
-    .replace(/\b(add|put|create|log|note|set|book|on|for|at|is|has|have|a|an|the)\b/gi, " ")
+  const cleaned = stripWhen(msg)
+    .replace(/\b(add|put|create|log|note|set up|set|book|schedule|make|need|want|get|find|please)\b/gi, " ")
+    .replace(/\b(i|we|me|my|our|us|a|an|the|to|for|on|at|of|is|are|am|has|have|had|will|would|can|could|do|does)\b/gi, " ")
+    .replace(/[.!?]+$/, "")
     .replace(/\s+/g, " ")
     .trim();
   return cleaned || msg.slice(0, 60);
@@ -187,10 +187,93 @@ function buildCalendarEvent(
   };
 }
 
+// ─── Entity extraction ──────────────────────────────────────────────────────────
+
+function cap(s: string): string {
+  return s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : s;
+}
+
+// A friendly human phrase for any date/time in the message:
+// "tomorrow", "Friday", "Friday at 2:00 PM", "June 22", or null if none.
+function friendlyWhen(msg: string): string | null {
+  const lower = msg.toLowerCase();
+  const iso = extractDateISO(msg);
+  if (!iso) {
+    if (/\bnext week\b/.test(lower)) return "next week";
+    if (/\bthis week\b/.test(lower)) return "this week";
+    return null;
+  }
+  const date = new Date(iso);
+  let dayLabel: string;
+  if (TOMORROW_RE.test(lower)) dayLabel = "tomorrow";
+  else if (TODAY_RE.test(lower)) dayLabel = "today";
+  else {
+    const diff = Math.round((date.getTime() - Date.now()) / 86400000);
+    dayLabel = diff >= 0 && diff < 7
+      ? date.toLocaleDateString("en-US", { weekday: "long" })
+      : date.toLocaleDateString("en-US", { month: "long", day: "numeric" });
+  }
+  const hasTime = /\b\d{1,2}(?::\d{2})?\s*(?:am|pm)\b|\bnoon\b|\bmidnight\b/i.test(msg);
+  return hasTime
+    ? `${dayLabel} at ${date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`
+    : dayLabel;
+}
+
+// Prefix a "when" phrase with the right preposition: relative phrases
+// ("tomorrow", "this week") take none; named days/dates take "on".
+function whenPhrase(w: string | null): string {
+  if (!w) return "";
+  if (/^(today|tonight|tomorrow|this week|next week)\b/i.test(w)) return ` ${w}`;
+  return ` on ${w}`;
+}
+
+// The person a message is about — matched against known family members,
+// or pulled from "remind X" / "for X" / "X's" patterns. Ignores pronouns.
+function extractPerson(msg: string, members: string[]): string | null {
+  for (const m of members) {
+    if (m && new RegExp(`\\b${m.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(msg)) return m;
+  }
+  const remind = msg.match(/\bremind\s+(\w+)/i);
+  if (remind && !/^(me|us|everyone|them|the|my|our|myself)$/i.test(remind[1])) return cap(remind[1]);
+  const forM = msg.match(/\bfor\s+([A-Z][a-z]+)\b/);
+  if (forM && !/^(the|my|our|us)$/i.test(forM[1])) return forM[1];
+  const poss = msg.match(/\b([A-Z][a-z]+)'s\b/);
+  if (poss) return poss[1];
+  return null;
+}
+
+// Strip every date/time form (days, dates, ordinals, times) from a phrase
+// so it doesn't read redundantly alongside a separate "when".
+function stripWhen(s: string): string {
+  return s
+    .replace(TOMORROW_RE, "").replace(TODAY_RE, "")
+    .replace(/\b(next|this)\s+week\b/gi, "")
+    .replace(/\b(next\s+)?(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/gi, "")
+    .replace(/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\.?\s+\d{1,2}(?:st|nd|rd|th)?\b/gi, "")
+    .replace(/\b\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\b/g, "")
+    .replace(/\b(?:the\s+)?\d{1,2}(?:st|nd|rd|th)\b/gi, "")
+    .replace(/\b\d{1,2}(?::\d{2})?\s*(?:am|pm)\b/gi, "")
+    .replace(/\b(noon|midnight)\b/gi, "")
+    .replace(/\b(on|at|for)\s*$/i, "")
+    .replace(/\s+/g, " ").trim();
+}
+
+// The kind of appointment mentioned, normalized for natural phrasing.
+function appointmentType(msg: string): string {
+  const m = msg.toLowerCase().match(/\b(dentist|doctor|dr\.?|vet|haircut|hair|nails?|nail|therapy|orthodontist|optometrist|checkup|physical|appointment|appt)\b/);
+  if (!m) return "appointment";
+  const w = m[1];
+  if (w === "dr" || w === "dr.") return "doctor";
+  if (w === "appt") return "appointment";
+  if (w === "hair") return "haircut";
+  if (w === "nails" || w === "nail") return "nail appointment";
+  return w;
+}
+
 // ─── Intent detection ─────────────────────────────────────────────────────────
 
 function detectIntent(msg: string, history: Message[]): string {
-  const lower = msg.toLowerCase();
+  const lower = msg.toLowerCase().trim();
   const recent = history.slice(-3).map(m => m.content.toLowerCase()).join(" ");
 
   // Meta / capability
@@ -198,43 +281,60 @@ function detectIntent(msg: string, history: Message[]): string {
       /book|call|order|schedule|do it|for real|real(ly)?|yourself/.test(lower))
     return "capability_question";
 
-  // About Kin
-  if (/what (are|can) you|who are you|what is kin|how do you work|what do you do/.test(lower))
+  // About Kin / help
+  if (/what (are|can) you|who are you|what is kin|how do you work|what do you do|^help\b|^help me|how (do|can) i use/.test(lower))
     return "what_is_kin";
 
   // Family knowledge
   if (/where (do|did) (i|we) live|my address|my neighborhood|where am i/.test(lower))
     return "where_live";
-  if (/who (is|are) (in )?(my|our) (family|household)|family members|who do i live with/.test(lower))
+  if (/who (is|are) (in )?(my|our) (family|household)|family members|who do i live with|list (my )?family/.test(lower))
     return "family_members";
   if (/(what('s| is) my name|who am i|my family name|our (last )?name)/.test(lower))
     return "family_name";
 
   // Time & weather
-  if (/what('s| is) the weather|weather (today|tomorrow|this week)/.test(lower))
+  if (/what('s| is) the weather|weather (today|tomorrow|this week|outside)/.test(lower))
     return "weather";
   if (/what time is it|what('s| is) today'?s? date|what day is/.test(lower))
     return "time_date";
 
   // Conversation
-  if (/^(hi|hey|hello|howdy|good (morning|afternoon|evening))[\s!.?]*$/.test(lower))
+  if (/^(hi+|hey+|hello+|yo|howdy|sup|good (morning|afternoon|evening))[\s!.?]*$/.test(lower))
     return "greeting";
-  if (/thank(s| you)|that('?s| is) (great|helpful|perfect|amazing|awesome)/.test(lower))
+  if (/^(thank(s| you)|ty|much appreciated)|that('?s| is) (great|helpful|perfect|amazing|awesome|wonderful)/.test(lower))
     return "thanks";
-  if (/how are you|how('?s| is) it going|you doing/.test(lower))
+  if (/how are you|how('?s| is) it going|you doing|how have you been/.test(lower))
     return "how_are_you";
 
+  // Short, standalone affirmations
+  if (/^(yes|yep|yeah|yup|ya|sure|ok|okay|k|sounds good|sounds great|go ahead|do it|please do|yes please|perfect|great|that works|works for me)[\s!.]*$/.test(lower))
+    return "affirmation";
+
+  // Calendar query — before add_to_calendar so "what do I have Friday" isn't a new event
+  if (/\bmy (schedule|calendar|agenda)\b/.test(lower) ||
+      /\bwhat do i have\b/.test(lower) ||
+      /(what('?s| is)|anything)\b[^?]*\b(on (my|the) (calendar|schedule)|going on|happening|planned|scheduled|coming up)\b/.test(lower))
+    return "calendar_query";
+
+  // Cancel / reschedule — before task matching so "cancel the dentist" isn't a new appointment
+  if (/\b(cancel|never ?mind|nevermind|scratch that|forget (it|that)|delete (it|that|the)|remove (it|that|the))\b/.test(lower))
+    return "cancel";
+  if (/\b(reschedule|resched|push (it|that|back)|bump (it|that))\b/.test(lower) ||
+      (/\b(move|change|switch)\b/.test(lower) && /\b(to|until|earlier|later|appointment|meeting|it|that|event)\b/.test(lower)))
+    return "reschedule";
+
   // Tasks
-  if (/lawn|mow|grass|yard (care|service)|landscap/.test(lower)) return "task_lawn";
-  if (/remind|reminder|don'?t (let|forget)|heads[ -]?up/.test(lower)) return "task_reminder";
-  if (/clean(ing|er)?|housekeeper|maid|tidy/.test(lower)) return "task_cleaning";
-  if (/grocery|groceries|shopping list|food (run|pickup)|meal prep/.test(lower)) return "task_grocery";
-  if (/\b(book|schedule|make|set up|add|create|need|get|put)\b.{0,30}\b(appointment|appt|dentist|doctor|dr\.|vet|hair|nail|therapy)\b/.test(lower) ||
-      /\b(appointment|appt|dentist|doctor|vet)\b/.test(lower))
+  if (/lawn|mow|grass|yard (care|service|work)|landscap|weed|edg(e|ing)/.test(lower)) return "task_lawn";
+  if (/remind|reminder|don'?t (let|forget)|heads[ -]?up|make sure (i|we)/.test(lower)) return "task_reminder";
+  if (/clean(ing|er)?|housekeep|maid|tidy|vacuum|deep clean/.test(lower)) return "task_cleaning";
+  if (/grocery|groceries|shopping list|food (run|pickup|shop)|meal prep/.test(lower)) return "task_grocery";
+  if (/\b(book|schedule|make|set up|add|create|need|get|find|put)\b.{0,30}\b(appointment|appt|dentist|doctor|dr\.?|vet|hair|haircut|nails?|therapy|checkup|physical)\b/.test(lower) ||
+      /\b(appointment|appt|dentist|doctor|vet|orthodontist|optometrist)\b/.test(lower))
     return "task_appointment";
-  if (/pick(ing)? up|drop(ping)? off|carpool|drive|uber/.test(lower)) return "task_transport";
-  if (/dinner|cook|recipe|restaurant|reserv/.test(lower)) return "task_dinner";
-  if (/pool|pest|repair|fix|plumb|electr|handyman|hvac|ac |a\/c/.test(lower)) return "task_home_service";
+  if (/pick(ing)?[ -]?up|drop(ping)?[ -]?off|carpool|drive|ride|uber|lyft/.test(lower)) return "task_transport";
+  if (/dinner|cook|recipe|restaurant|reserv|takeout|order food/.test(lower)) return "task_dinner";
+  if (/pool|pest|repair|fix|broken|leak|plumb|electr|handyman|hvac|\bac\b|a\/c|appliance/.test(lower)) return "task_home_service";
 
   // Follow-ups based on recent context
   if (recent.includes("lawn") || recent.includes("mow")) return "task_lawn_followup";
@@ -259,7 +359,9 @@ function generateResponse(
 ): { reply: string; activity?: { title: string; category: string; status: string } } {
 
   const day = extractDay(msg);
+  const when = friendlyWhen(msg);
   const members = ctx.members.map(m => m.name);
+  const person = extractPerson(msg, members);
   const shortName = ctx.name.replace(/^the\s+/i, "").replace(/s$/i, "");
 
   switch (intent) {
@@ -318,11 +420,14 @@ function generateResponse(
       ]) };
 
     case "task_lawn": {
-      const when = day ? `for ${day}` : "this week";
+      const whenStr = when ?? "this week";
       const yard = ctx.preferences?.yard_type ? ` (${ctx.preferences.yard_type} yard)` : "";
       return {
-        reply: `Got it — I'll line up lawn care ${when}${yard}. I'll coordinate with a vendor in ${ctx.neighborhood} and update the activity feed once it's confirmed.`,
-        activity: { title: `Lawn care — ${day ?? "this week"}`, category: "lawn", status: "in_progress" },
+        reply: pick([
+          `Got it — lawn care for ${whenStr}${yard}. I'll line up a crew near ${ctx.neighborhood} and confirm once it's booked.`,
+          `On it — I'll arrange lawn care for ${whenStr}${yard} with a trusted vendor in ${ctx.neighborhood}.`,
+        ]),
+        activity: { title: `Lawn care — ${when ?? "this week"}`, category: "lawn", status: "in_progress" },
       };
     }
 
@@ -333,13 +438,20 @@ function generateResponse(
       ]) };
 
     case "task_reminder": {
-      const nameMatch = msg.match(/remind (\w+)/i);
-      const who = nameMatch ? nameMatch[1] : (members[0] ?? "everyone");
-      const aboutMatch = msg.match(/about (.+)/i);
-      const about = aboutMatch ? aboutMatch[1].replace(/[.!?]+$/, "") : "that";
+      const who = person ?? "you";
+      const m = msg.match(/\b(about|to|that)\s+(.+)/i);
+      const verb = m && m[1].toLowerCase() === "to" ? "to" : "about";
+      const about = m ? stripWhen(m[2].replace(/[.!?]+$/, "")) : null;
+      const whenStr = whenPhrase(when);
+      if (!about) {
+        return { reply: `Happy to set that reminder${who !== "you" ? ` for ${who}` : ""}. What should I remind ${who} about, and when?` };
+      }
       return {
-        reply: `Done — I'll remind ${who} about ${about}. They'll get a heads-up the day before and again an hour out.`,
-        activity: { title: `Reminder for ${who}: ${about}`, category: "reminder", status: "pending" },
+        reply: pick([
+          `Done — I'll remind ${who} ${verb} ${about}${whenStr}. A heads-up goes out ahead of time.`,
+          `Got it — reminder set${who !== "you" ? ` for ${who}` : ""} ${verb} ${about}${whenStr}.`,
+        ]),
+        activity: { title: `Reminder${who !== "you" ? ` for ${who}` : ""}: ${about}`, category: "reminder", status: "pending" },
       };
     }
 
@@ -349,8 +461,10 @@ function generateResponse(
     case "task_cleaning": {
       const size = ctx.preferences?.home_size ? ` for your ${ctx.preferences.home_size} home` : "";
       return {
-        reply: `I'll coordinate cleaning${size}. ${day ? `Aiming for ${day}.` : "What day works best?"} Any focus areas, or the usual full house?`,
-        activity: { title: `House cleaning${day ? ` — ${day}` : ""}`, category: "general", status: "pending" },
+        reply: when
+          ? `I'll coordinate cleaning${size} for ${when}. Any focus areas, or the usual full house?`
+          : `I'll set up cleaning${size}. What day works best — and any focus areas?`,
+        activity: { title: `House cleaning${when ? ` — ${when}` : ""}`, category: "general", status: "pending" },
       };
     }
 
@@ -358,44 +472,92 @@ function generateResponse(
       return { reply: "Got it — I'll note that for the cleaners. Anything else to add?" };
 
     case "task_grocery": {
-      const diet = ctx.preferences?.dietary_notes ? ` (keeping in mind: ${ctx.preferences.dietary_notes})` : "";
+      const diet = ctx.preferences?.dietary_notes ? ` (noting ${ctx.preferences.dietary_notes})` : "";
       return {
-        reply: `Added to the list${diet}. Want me to set a reminder before your usual shopping run?`,
-        activity: { title: msg.slice(0, 60), category: "errand", status: "pending" },
+        reply: pick([
+          `Added to the grocery list${diet}. Want a reminder before your usual run?`,
+          `Got it — on the list${diet}. Anything else to add while I'm at it?`,
+        ]),
+        activity: { title: stripWhen(extractEventTitle(msg)).slice(0, 60) || "Grocery run", category: "errand", status: "pending" },
       };
     }
 
-    case "task_appointment":
+    case "task_appointment": {
+      const what = appointmentType(msg);
+      const forWhom = person ? ` for ${person}` : "";
+      if (when) {
+        return {
+          reply: pick([
+            `Done — I've got the ${what}${forWhom} down for ${when}. I'll have your Kin coordinator confirm the booking.`,
+            `Got it — ${what}${forWhom}, ${when}. We'll lock in the appointment and confirm shortly.`,
+          ]),
+          activity: { title: `${cap(what)}${forWhom}`, category: "booking", status: "in_progress" },
+        };
+      }
       return {
-        reply: `I'll get that scheduled${day ? ` for ${day}` : ""}. Who is this for${members.length > 1 ? ` — ${members.join(" or ")}?` : "?"}`,
-        activity: { title: msg.slice(0, 60), category: "booking", status: "pending" },
+        reply: `Sure — I'll set up the ${what}${forWhom}. What day and time should I aim for?`,
+        activity: { title: `${cap(what)}${forWhom}`, category: "booking", status: "pending" },
       };
+    }
 
-    case "task_transport":
+    case "task_transport": {
+      const forWhom = person ? ` ${person}` : "";
+      const whenStr = whenPhrase(when);
       return {
-        reply: `I'll add that to the calendar. ${day ? `Who needs to be where on ${day}?` : "What's the day and destination?"}`,
-        activity: { title: msg.slice(0, 60), category: "general", status: "pending" },
+        reply: (when || person)
+          ? `Got it — I'll sort the pickup/drop-off${forWhom ? ` for${forWhom}` : ""}${whenStr} and confirm the ride details.`
+          : `I can set up a ride. Who needs to go where, and when?`,
+        activity: { title: stripWhen(extractEventTitle(msg)).slice(0, 60) || "Transportation", category: "general", status: "pending" },
       };
+    }
 
-    case "task_dinner":
+    case "task_dinner": {
+      const diet = ctx.preferences?.dietary_notes ? ` (keeping ${ctx.preferences.dietary_notes} in mind)` : "";
+      const whenStr = when ? ` for ${when}` : "";
       return {
-        reply: `On it${ctx.preferences?.dietary_notes ? ` — keeping in mind ${ctx.preferences.dietary_notes}` : ""}. Any preferences, or should I suggest a few spots near ${ctx.neighborhood}?`,
-        activity: { title: msg.slice(0, 60), category: "errand", status: "pending" },
+        reply: `On it${diet} — dinner${whenStr}. Want a few spots near ${ctx.neighborhood}, or are you cooking?`,
+        activity: { title: `Dinner${when ? ` — ${when}` : ""}`, category: "errand", status: "pending" },
       };
+    }
 
     case "task_home_service":
       return {
-        reply: `I'll find a reliable vendor in ${ctx.neighborhood} for that. ${day ? `Aiming for ${day}.` : "When works for you?"} Any history with this issue I should know about?`,
-        activity: { title: msg.slice(0, 60), category: "general", status: "in_progress" },
+        reply: `I'll find a reliable vendor in ${ctx.neighborhood} for that.${when ? ` Aiming for ${when}.` : " When works for you?"} Anything about the issue I should pass along?`,
+        activity: { title: stripWhen(extractEventTitle(msg)).slice(0, 60) || "Home service", category: "general", status: "in_progress" },
       };
 
     case "add_to_calendar": {
       const title = extractEventTitle(msg);
+      const forWhom = person && !title.toLowerCase().includes(person.toLowerCase()) ? ` for ${person}` : "";
       return {
-        reply: `Got it — "${title}" is set.`,
+        reply: `Got it — I've got "${title}"${forWhom}${when ? ` down for ${when}` : ""}.`,
         activity: { title, category: "general", status: "done" },
       };
     }
+
+    case "affirmation":
+      return { reply: pick([
+        "Perfect — consider it handled. Anything else?",
+        "Great, I'm on it. What else can I take off your plate?",
+        "Done. Let me know if there's anything else.",
+      ]) };
+
+    case "calendar_query":
+      return { reply: pick([
+        "Your full schedule lives on the Calendar tab — everything I've set up is there. Want me to add or move anything?",
+        "Take a peek at the Calendar tab for what's coming up. Anything you'd like me to schedule?",
+      ]) };
+
+    case "cancel":
+      return { reply: pick([
+        "No problem — I'll hold off on that. You can also remove anything directly from the Calendar tab.",
+        "Got it, I won't move forward with it. Anything you'd like to set up instead?",
+      ]) };
+
+    case "reschedule":
+      return { reply: when
+        ? `Sure — I'll move that to ${when} and confirm. You can also drag it on the Calendar tab.`
+        : "Happy to reschedule — what day and time should I move it to?" };
 
     default:
       return {
