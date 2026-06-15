@@ -55,6 +55,42 @@ body {
   }
 }
 
+/* Legal pages (privacy / terms) */
+.legal-prose {
+  color: #c9c8c0;
+  font-size: 15px;
+  line-height: 1.7;
+}
+.legal-prose h2 {
+  color: #f0efe8;
+  font-size: 18px;
+  font-weight: 600;
+  margin: 32px 0 10px;
+}
+.legal-prose h2:first-child {
+  margin-top: 0;
+}
+.legal-prose p {
+  margin: 0 0 14px;
+}
+.legal-prose ul {
+  margin: 0 0 14px;
+  padding-left: 20px;
+  list-style: disc;
+}
+.legal-prose li {
+  margin: 0 0 6px;
+}
+.legal-prose strong {
+  color: #f0efe8;
+  font-weight: 600;
+}
+.legal-prose a {
+  color: #15c489;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 @layer utilities {
   .text-balance {
     text-wrap: balance;

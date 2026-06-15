@@ -105,9 +105,14 @@ export default function LoginPage() {
         </p>
       </div>
 
-      <p className="mt-16 text-xs text-text-muted text-center">
-        Northwest Hills · Austin, TX 78731
-      </p>
+      <div className="mt-16 text-xs text-text-muted text-center space-y-2">
+        <div className="flex items-center justify-center gap-4">
+          <Link href="/privacy" className="hover:text-text-secondary transition-colors">Privacy</Link>
+          <span className="opacity-40">·</span>
+          <Link href="/terms" className="hover:text-text-secondary transition-colors">Terms</Link>
+        </div>
+        <p>Northwest Hills · Austin, TX 78731</p>
+      </div>
     </div>
   );
 }
