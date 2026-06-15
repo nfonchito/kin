@@ -68,10 +68,23 @@ export function ChatInterface({ familyId, initialMessages }: ChatInterfaceProps)
     setLoading(true);
 
     try {
+      // In preview mode the server has no database, so pass the family's
+      // saved profile from the browser so the assistant can personalize.
+      let context: Record<string, unknown> | undefined;
+      if (familyId === "preview") {
+        try {
+          context = {
+            name: localStorage.getItem("kin_family_name") || undefined,
+            neighborhood: localStorage.getItem("kin_neighborhood") || undefined,
+            members: JSON.parse(localStorage.getItem("kin_members") || "[]"),
+          };
+        } catch {}
+      }
+
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text.trim(), familyId }),
+        body: JSON.stringify({ message: text.trim(), familyId, context }),
       });
 
       const data = await res.json();

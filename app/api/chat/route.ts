@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 import { sendTaskNotification } from "@/lib/email";
+import { generateSmartReply } from "@/lib/ai";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -270,8 +271,10 @@ function generateResponse(
         "Not autonomously yet — think of me as the layer that never forgets. I log it, your Kin team handles it. Want me to put this in the queue?",
       ]) };
 
-    case "what_is_kin":
-      return { reply: `I'm Kin — your family's assistant. I handle the mental load of running a household: booking services, reminders, calendar, errands. I know the ${ctx.name} family and your home in ${ctx.neighborhood}, so you don't have to re-explain things each time. What can I take off your plate?` };
+    case "what_is_kin": {
+      const knows = ctx.name === "your family" ? "your family" : `the ${ctx.name}`;
+      return { reply: `I'm Kin — your family's assistant. I handle the mental load of running a household: booking services, reminders, calendar, errands. I know ${knows} and your home in ${ctx.neighborhood}, so you don't have to re-explain things each time. What can I take off your plate?` };
+    }
 
     case "where_live":
       return { reply: `You're in ${ctx.neighborhood}, ${ctx.city}, ${ctx.state} ${ctx.zip}. I've got your neighborhood dialed in for local vendors and services.` };
@@ -409,23 +412,30 @@ function generateResponse(
 // ─── Route handler ────────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
-  const { message, familyId } = await req.json();
+  const { message, familyId, context } = await req.json();
   if (!message || !familyId)
     return NextResponse.json({ error: "Missing message or familyId" }, { status: 400 });
 
-  // Preview mode — no Supabase
+  // Preview mode — no Supabase. Use the profile the client passes from localStorage.
   if (familyId === "preview") {
+    const provided = context && typeof context === "object" ? context : {};
     const ctx: FamilyContext = {
-      name: "your family",
-      neighborhood: "your neighborhood",
+      name: provided.name || "your family",
+      neighborhood: provided.neighborhood || "your neighborhood",
       city: "Austin", state: "TX", zip: "",
-      members: [],
+      members: Array.isArray(provided.members) ? provided.members : [],
       preferences: null,
     };
     const intent = detectIntent(message, []);
     const { reply, activity } = generateResponse(intent, message, ctx);
     const calEvent = activity ? buildCalendarEvent(activity, message) : null;
-    const finalReply = calEvent ? `${reply} I've added it to your calendar.` : reply;
+
+    // Use Claude for the reply when an API key is configured; otherwise fall back.
+    const smart = await generateSmartReply(message, ctx, [], {
+      calendarEvent: calEvent ? { title: calEvent.title, start_time: calEvent.start_time } : null,
+      activity: activity ?? null,
+    });
+    const finalReply = smart ?? (calEvent ? `${reply} I've added it to your calendar.` : reply);
 
     if (activity) {
       void sendTaskNotification({
@@ -481,7 +491,13 @@ export async function POST(req: NextRequest) {
   const intent = detectIntent(message, history);
   const { reply, activity } = generateResponse(intent, message, ctx);
   const calEvent = activity ? buildCalendarEvent(activity, message) : null;
-  const finalReply = calEvent ? `${reply} I've added it to your calendar.` : reply;
+
+  // Use Claude for the reply when an API key is configured; otherwise fall back.
+  const smart = await generateSmartReply(message, ctx, history, {
+    calendarEvent: calEvent ? { title: calEvent.title, start_time: calEvent.start_time } : null,
+    activity: activity ?? null,
+  });
+  const finalReply = smart ?? (calEvent ? `${reply} I've added it to your calendar.` : reply);
 
   // Save assistant message
   const { data: assistantMsg } = await supabase
