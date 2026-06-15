@@ -29,8 +29,14 @@ function pick<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
+// Texting shorthand for "tomorrow" / "today" so casual typing still works.
+const TOMORROW_RE = /\b(tomorrow|tomorow|tommorow|tommorrow|tomoro|tomorro|tmrw|tmrrw|tmmr|tmr|tmw|tomo|tomm|2moro|2morrow)\b/i;
+const TODAY_RE = /\b(today|tonight|tonite|2day)\b/i;
+
 function extractDay(msg: string): string | null {
-  const m = msg.match(/(monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow|today|this week|next week)/i);
+  if (TOMORROW_RE.test(msg)) return "tomorrow";
+  if (TODAY_RE.test(msg)) return "today";
+  const m = msg.match(/(monday|tuesday|wednesday|thursday|friday|saturday|sunday|this week|next week)/i);
   return m ? m[1] : null;
 }
 
@@ -56,8 +62,8 @@ function extractDateISO(msg: string): string | null {
   const now = new Date();
   const at = (d: Date) => { d.setHours(hh, mm, 0, 0); return d.toISOString(); };
 
-  if (/\btomorrow\b/.test(lower)) { const d = new Date(now); d.setDate(d.getDate() + 1); return at(d); }
-  if (/\b(today|tonight)\b/.test(lower)) return at(new Date(now));
+  if (TOMORROW_RE.test(lower)) { const d = new Date(now); d.setDate(d.getDate() + 1); return at(d); }
+  if (TODAY_RE.test(lower)) return at(new Date(now));
 
   // Weekday (optionally preceded by "next")
   const days = ["sunday","monday","tuesday","wednesday","thursday","friday","saturday"];
