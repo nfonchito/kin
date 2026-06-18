@@ -8,13 +8,9 @@ export async function updateSession(request: NextRequest) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  // If env vars are not configured, send root to /login but let everything else through
+  // If env vars are not configured (preview mode), let every page through —
+  // the landing page lives at "/", and login/signup go straight to the dashboard.
   if (!supabaseUrl || !supabaseKey || supabaseUrl.includes("placeholder")) {
-    if (request.nextUrl.pathname === "/") {
-      const url = request.nextUrl.clone();
-      url.pathname = "/login";
-      return NextResponse.redirect(url);
-    }
     return supabaseResponse;
   }
 
