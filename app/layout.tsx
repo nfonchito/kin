@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 const siteUrl =
@@ -15,7 +15,7 @@ export const metadata: Metadata = {
     "Kin is a personal assistant for busy families — it organizes tasks, reminders, and your family calendar so nothing falls through the cracks.",
   applicationName: "Kin",
   keywords: ["family assistant", "household organizer", "family calendar", "reminders", "Kin"],
-  icons: { icon: "/favicon.svg" },
+  appleWebApp: { capable: true, title: "Kin", statusBarStyle: "black-translucent" },
   openGraph: {
     title: "Kin — Family Assistant",
     description:
@@ -31,6 +31,10 @@ export const metadata: Metadata = {
     description:
       "A personal assistant for busy families. Organize tasks, reminders, and your family calendar in one place.",
   },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#090907",
 };
 
 export default function RootLayout({
