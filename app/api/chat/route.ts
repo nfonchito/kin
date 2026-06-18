@@ -227,6 +227,22 @@ function whenPhrase(w: string | null): string {
   return ` on ${w}`;
 }
 
+// A recurring cadence phrase ("every Monday", "every morning", "weekly"), or null.
+function extractRecurrence(msg: string): string | null {
+  const l = msg.toLowerCase();
+  const wd = l.match(/\bevery\s+(sunday|monday|tuesday|wednesday|thursday|friday|saturday)s?\b/);
+  if (wd) return `every ${cap(wd[1])}`;
+  if (/\bevery weekday\b|\bweekdays\b/.test(l)) return "every weekday";
+  if (/\bevery other week\b|\bbi-?weekly\b/.test(l)) return "every other week";
+  if (/\bevery morning\b/.test(l)) return "every morning";
+  if (/\bevery (night|evening)\b/.test(l)) return "every evening";
+  if (/\bevery day\b|\bdaily\b|\beach day\b/.test(l)) return "every day";
+  if (/\bevery week\b|\bweekly\b|\beach week\b/.test(l)) return "every week";
+  if (/\bevery month\b|\bmonthly\b|\beach month\b/.test(l)) return "every month";
+  if (/\bevery year\b|\byearly\b|\bannually\b/.test(l)) return "every year";
+  return null;
+}
+
 // The person a message is about — matched against known family members,
 // or pulled from "remind X" / "for X" / "X's" patterns. Ignores pronouns.
 function extractPerson(msg: string, members: string[]): string | null {
@@ -247,6 +263,11 @@ function extractPerson(msg: string, members: string[]): string | null {
 function stripWhen(s: string): string {
   return s
     .replace(TOMORROW_RE, "").replace(TODAY_RE, "")
+    // recurrence phrases first, so "every monday" is removed as a unit
+    .replace(/\bevery\s+other\s+week\b/gi, "")
+    .replace(/\bevery\s+(sunday|monday|tuesday|wednesday|thursday|friday|saturday)s?\b/gi, "")
+    .replace(/\bevery\s+(weekday|day|morning|evening|night|week|month|year)\b/gi, "")
+    .replace(/\b(daily|weekly|monthly|yearly|annually|bi-?weekly|weekdays)\b/gi, "")
     .replace(/\b(next|this)\s+week\b/gi, "")
     .replace(/\b(next\s+)?(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/gi, "")
     .replace(/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\.?\s+\d{1,2}(?:st|nd|rd|th)?\b/gi, "")
@@ -360,6 +381,7 @@ function generateResponse(
 
   const day = extractDay(msg);
   const when = friendlyWhen(msg);
+  const recurrence = extractRecurrence(msg);
   const members = ctx.members.map(m => m.name);
   const person = extractPerson(msg, members);
   const shortName = ctx.name.replace(/^the\s+/i, "").replace(/s$/i, "");
@@ -420,14 +442,16 @@ function generateResponse(
       ]) };
 
     case "task_lawn": {
-      const whenStr = when ?? "this week";
+      const whenStr = recurrence ?? when ?? "this week";
       const yard = ctx.preferences?.yard_type ? ` (${ctx.preferences.yard_type} yard)` : "";
       return {
-        reply: pick([
-          `Got it — lawn care for ${whenStr}${yard}. I'll line up a crew near ${ctx.neighborhood} and confirm once it's booked.`,
-          `On it — I'll arrange lawn care for ${whenStr}${yard} with a trusted vendor in ${ctx.neighborhood}.`,
-        ]),
-        activity: { title: `Lawn care — ${when ?? "this week"}`, category: "lawn", status: "in_progress" },
+        reply: recurrence
+          ? `Got it — recurring lawn care ${recurrence}${yard}. I'll set up a standing booking with a crew near ${ctx.neighborhood}.`
+          : pick([
+              `Got it — lawn care for ${whenStr}${yard}. I'll line up a crew near ${ctx.neighborhood} and confirm once it's booked.`,
+              `On it — I'll arrange lawn care for ${whenStr}${yard} with a trusted vendor in ${ctx.neighborhood}.`,
+            ]),
+        activity: { title: `Lawn care — ${recurrence ?? when ?? "this week"}`, category: "lawn", status: "in_progress" },
       };
     }
 
@@ -442,16 +466,20 @@ function generateResponse(
       const m = msg.match(/\b(about|to|that)\s+(.+)/i);
       const verb = m && m[1].toLowerCase() === "to" ? "to" : "about";
       const about = m ? stripWhen(m[2].replace(/[.!?]+$/, "")) : null;
-      const whenStr = whenPhrase(when);
+      // A recurring cadence takes priority over a one-time date in the phrasing.
+      const timing = recurrence ? ` ${recurrence}` : whenPhrase(when);
+      const recurTag = recurrence ? ` (${recurrence})` : "";
       if (!about) {
         return { reply: `Happy to set that reminder${who !== "you" ? ` for ${who}` : ""}. What should I remind ${who} about, and when?` };
       }
       return {
-        reply: pick([
-          `Done — I'll remind ${who} ${verb} ${about}${whenStr}. A heads-up goes out ahead of time.`,
-          `Got it — reminder set${who !== "you" ? ` for ${who}` : ""} ${verb} ${about}${whenStr}.`,
-        ]),
-        activity: { title: `Reminder${who !== "you" ? ` for ${who}` : ""}: ${about}`, category: "reminder", status: "pending" },
+        reply: recurrence
+          ? `Done — I'll remind ${who} ${verb} ${about}${timing}, on repeat. I'll keep it going until you tell me to stop.`
+          : pick([
+              `Done — I'll remind ${who} ${verb} ${about}${timing}. A heads-up goes out ahead of time.`,
+              `Got it — reminder set${who !== "you" ? ` for ${who}` : ""} ${verb} ${about}${timing}.`,
+            ]),
+        activity: { title: `Reminder${who !== "you" ? ` for ${who}` : ""}: ${about}${recurTag}`, category: "reminder", status: "pending" },
       };
     }
 
@@ -461,10 +489,12 @@ function generateResponse(
     case "task_cleaning": {
       const size = ctx.preferences?.home_size ? ` for your ${ctx.preferences.home_size} home` : "";
       return {
-        reply: when
-          ? `I'll coordinate cleaning${size} for ${when}. Any focus areas, or the usual full house?`
-          : `I'll set up cleaning${size}. What day works best — and any focus areas?`,
-        activity: { title: `House cleaning${when ? ` — ${when}` : ""}`, category: "general", status: "pending" },
+        reply: recurrence
+          ? `I'll set up recurring cleaning${size} ${recurrence}. Same crew each time, and any focus areas you want me to flag?`
+          : when
+            ? `I'll coordinate cleaning${size} for ${when}. Any focus areas, or the usual full house?`
+            : `I'll set up cleaning${size}. What day works best — and any focus areas?`,
+        activity: { title: `House cleaning${recurrence ? ` — ${recurrence}` : when ? ` — ${when}` : ""}`, category: "general", status: "pending" },
       };
     }
 
