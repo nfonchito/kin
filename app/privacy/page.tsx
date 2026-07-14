@@ -6,7 +6,7 @@ export const metadata: Metadata = {
   description: "How Kin collects, uses, and protects your family's information.",
 };
 
-const CONTACT_EMAIL = "hello@kinfamily.app"; // TODO: replace with a real monitored address
+const CONTACT_EMAIL = "hello@kinfamily.app"; // domain owned; set up inbound forwarding so replies reach a monitored inbox
 
 export default function PrivacyPage() {
   return (
