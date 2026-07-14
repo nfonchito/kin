@@ -708,13 +708,16 @@ export async function POST(req: NextRequest) {
       description: message,
     });
 
-    void sendTaskNotification({
-      userMessage: message,
-      kinReply: finalReply,
-      taskTitle: activity.title,
-      taskCategory: activity.category,
-      taskStatus: activity.status,
-    });
+    void sendTaskNotification(
+      {
+        userMessage: message,
+        kinReply: finalReply,
+        taskTitle: activity.title,
+        taskCategory: activity.category,
+        taskStatus: activity.status,
+      },
+      { userEmail: user.email }
+    );
   }
 
   // Create calendar event when a specific day was mentioned

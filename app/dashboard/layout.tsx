@@ -31,11 +31,25 @@ export default async function DashboardLayout({
   }
 
   const userEmail = user.email ?? "";
-  const { data: family } = await supabase
+  let { data: family } = await supabase
     .from("families")
     .select("*")
     .eq("user_id", user.id)
     .single();
+
+  // Fallback: if the signup trigger didn't create the family row, create it
+  // here so a fresh account is never stuck without one.
+  if (!family) {
+    const { data: created } = await supabase
+      .from("families")
+      .insert({
+        user_id: user.id,
+        name: (user.user_metadata?.family_name as string) || "My Family",
+      })
+      .select()
+      .single();
+    family = created;
+  }
 
   return (
     <div className="flex h-screen bg-bg overflow-hidden">

@@ -31,13 +31,26 @@ export function emailConfig() {
   };
 }
 
-async function send(subject: string, html: string): Promise<SendResult> {
-  const to = process.env.NOTIFICATION_EMAIL;
+// Who a notification goes to: the user's own email when provided, else the
+// owner inbox (NOTIFICATION_EMAIL). The owner is bcc'd on user-bound sends so
+// every request stays visible for manual fulfillment.
+export function resolveRecipients(
+  userEmail: string | null | undefined,
+  owner: string | null | undefined
+): { to: string; bcc?: string } | null {
+  const to = userEmail || owner;
+  if (!to) return null;
+  const bcc = owner && owner.toLowerCase() !== to.toLowerCase() ? owner : undefined;
+  return bcc ? { to, bcc } : { to };
+}
+
+async function send(subject: string, html: string, userEmail?: string | null): Promise<SendResult> {
   if (!resend) return { ok: false, error: "RESEND_API_KEY is not set on the server" };
-  if (!to) return { ok: false, error: "NOTIFICATION_EMAIL is not set on the server" };
+  const recipients = resolveRecipients(userEmail, process.env.NOTIFICATION_EMAIL);
+  if (!recipients) return { ok: false, error: "No recipient: no user email and NOTIFICATION_EMAIL is not set" };
 
   try {
-    const { data, error } = await resend.emails.send({ from: FROM, to, subject, html });
+    const { data, error } = await resend.emails.send({ from: FROM, subject, html, ...recipients });
     if (error) {
       // Resend returns API errors here (e.g. 403 test-sender restriction) without throwing
       console.error("[email] Resend rejected the send:", error);
@@ -51,8 +64,11 @@ async function send(subject: string, html: string): Promise<SendResult> {
   }
 }
 
-export async function sendTaskNotification(n: TaskNotification): Promise<SendResult> {
-  const res = await send(`Kin · ${n.taskTitle}`, renderTaskHtml(n));
+export async function sendTaskNotification(
+  n: TaskNotification,
+  opts?: { userEmail?: string | null }
+): Promise<SendResult> {
+  const res = await send(`Kin · ${n.taskTitle}`, renderTaskHtml(n), opts?.userEmail);
   if (!res.ok) console.error("[email] task notification failed:", res.error);
   return res;
 }

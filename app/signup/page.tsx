@@ -13,15 +13,26 @@ export default function SignupPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [needsConfirm, setNeedsConfirm] = useState(false);
+
+  const isPreview = !process.env.NEXT_PUBLIC_SUPABASE_URL ||
+    process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder");
 
   async function handleSignup(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     setError("");
 
+    // Preview mode — no real auth, just go to dashboard
+    if (isPreview) {
+      if (familyName) localStorage.setItem("kin_family_name", familyName);
+      router.push("/dashboard");
+      return;
+    }
+
     try {
       const supabase = createClient();
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -31,6 +42,9 @@ export default function SignupPage() {
 
       if (error) {
         setError(error.message);
+      } else if (!data.session) {
+        // Email confirmation is required — no session until the link is clicked
+        setNeedsConfirm(true);
       } else {
         router.push("/dashboard");
         router.refresh();
@@ -40,6 +54,35 @@ export default function SignupPage() {
     } finally {
       setLoading(false);
     }
+  }
+
+  if (needsConfirm) {
+    return (
+      <div className="min-h-screen bg-bg flex flex-col items-center justify-center px-4">
+        <div className="w-full max-w-sm text-center">
+          <div className="flex justify-center mb-8">
+            <KinLogo size={48} />
+          </div>
+          <div className="bg-surface border border-border rounded-2xl px-6 py-8">
+            <h1 className="text-xl font-semibold text-text-primary mb-2">Check your email 📬</h1>
+            <p className="text-sm text-text-secondary leading-relaxed">
+              We sent a confirmation link to{" "}
+              <span className="text-text-primary font-medium">{email}</span>.
+              Click it to activate your account, then sign in.
+            </p>
+            <Link
+              href="/login"
+              className="inline-block mt-6 text-sm font-medium text-teal hover:text-teal-dim transition-colors"
+            >
+              Go to sign in
+            </Link>
+          </div>
+          <p className="mt-6 text-xs text-text-muted">
+            Nothing arriving? Check your spam folder.
+          </p>
+        </div>
+      </div>
+    );
   }
 
   return (
