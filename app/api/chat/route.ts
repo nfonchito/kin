@@ -2,6 +2,16 @@ import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 import { sendTaskNotification } from "@/lib/email";
 import { generateSmartReply } from "@/lib/ai";
+import {
+  TOMORROW_RE,
+  TODAY_RE,
+  extractDay,
+  extractDateISO,
+  hasDateLike,
+  friendlyWhen,
+  whenPhrase,
+  formatUserNow,
+} from "@/lib/dates";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -28,102 +38,6 @@ interface FamilyContext {
 
 function pick<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
-}
-
-// Texting shorthand for "tomorrow" / "today" so casual typing still works.
-const TOMORROW_RE = /\b(tomorrow|tomorow|tommorow|tommorrow|tomoro|tomorro|tmrw|tmrrw|tmmr|tmr|tmw|tomo|tomm|2moro|2morrow)\b/i;
-const TODAY_RE = /\b(today|tonight|tonite|2day)\b/i;
-
-function extractDay(msg: string): string | null {
-  if (TOMORROW_RE.test(msg)) return "tomorrow";
-  if (TODAY_RE.test(msg)) return "today";
-  const m = msg.match(/(monday|tuesday|wednesday|thursday|friday|saturday|sunday|this week|next week)/i);
-  return m ? m[1] : null;
-}
-
-function extractTime(msg: string): string {
-  const lower = msg.toLowerCase();
-  if (/\bnoon\b/.test(lower)) return "12:00";
-  if (/\bmidnight\b/.test(lower)) return "00:00";
-  const m = msg.match(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/i);
-  if (!m) return "09:00";
-  let h = parseInt(m[1]);
-  const min = m[2] ? parseInt(m[2]) : 0;
-  if (m[3].toLowerCase() === "pm" && h !== 12) h += 12;
-  if (m[3].toLowerCase() === "am" && h === 12) h = 0;
-  return `${String(h).padStart(2, "0")}:${String(min).padStart(2, "0")}`;
-}
-
-const MONTHS_ABBR = ["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"];
-
-// Parse any date reference in a freeform message into an ISO datetime, or null.
-function extractDateISO(msg: string): string | null {
-  const lower = msg.toLowerCase();
-  const [hh, mm] = extractTime(msg).split(":").map(Number);
-  const now = new Date();
-  const at = (d: Date) => { d.setHours(hh, mm, 0, 0); return d.toISOString(); };
-
-  if (TOMORROW_RE.test(lower)) { const d = new Date(now); d.setDate(d.getDate() + 1); return at(d); }
-  if (TODAY_RE.test(lower)) return at(new Date(now));
-
-  // Weekday (optionally preceded by "next")
-  const days = ["sunday","monday","tuesday","wednesday","thursday","friday","saturday"];
-  const wd = lower.match(/\b(next\s+)?(sunday|monday|tuesday|wednesday|thursday|friday|saturday)\b/);
-  if (wd) {
-    const d = new Date(now);
-    let ahead = days.indexOf(wd[2]) - d.getDay();
-    if (ahead <= 0) ahead += 7;
-    d.setDate(d.getDate() + ahead);
-    return at(d);
-  }
-
-  // "next week" → next Monday
-  if (/\bnext week\b/.test(lower)) {
-    const d = new Date(now);
-    let ahead = 1 - d.getDay(); if (ahead <= 0) ahead += 7; ahead += 7;
-    d.setDate(d.getDate() + ahead); return at(d);
-  }
-
-  // Month name + day  ("june 22", "jun 22nd", "sept 3")
-  const mn = lower.match(/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\.?\s+(\d{1,2})(?:st|nd|rd|th)?\b/);
-  if (mn) {
-    const mi = MONTHS_ABBR.indexOf(mn[1].slice(0, 3));
-    const day = parseInt(mn[2]);
-    if (mi >= 0 && day >= 1 && day <= 31) {
-      let d = new Date(now.getFullYear(), mi, day, hh, mm, 0, 0);
-      if (d < now) d = new Date(now.getFullYear() + 1, mi, day, hh, mm, 0, 0);
-      return d.toISOString();
-    }
-  }
-
-  // Numeric M/D or M/D/Y  ("6/22", "06/22/2026")
-  const num = lower.match(/\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/);
-  if (num) {
-    const mi = parseInt(num[1]) - 1, day = parseInt(num[2]);
-    const year = num[3] ? (num[3].length === 2 ? 2000 + parseInt(num[3]) : parseInt(num[3])) : now.getFullYear();
-    if (mi >= 0 && mi <= 11 && day >= 1 && day <= 31) {
-      let d = new Date(year, mi, day, hh, mm, 0, 0);
-      if (!num[3] && d < now) d = new Date(year + 1, mi, day, hh, mm, 0, 0);
-      return d.toISOString();
-    }
-  }
-
-  // Day-of-month ordinal  ("the 20th", "on the 3rd", "22nd")
-  const dom = lower.match(/\b(?:on\s+)?(?:the\s+)?(\d{1,2})(?:st|nd|rd|th)\b/);
-  if (dom) {
-    const day = parseInt(dom[1]);
-    if (day >= 1 && day <= 31) {
-      let d = new Date(now.getFullYear(), now.getMonth(), day, hh, mm, 0, 0);
-      if (d < now) d = new Date(now.getFullYear(), now.getMonth() + 1, day, hh, mm, 0, 0);
-      return d.toISOString();
-    }
-  }
-
-  return null;
-}
-
-function hasDateLike(msg: string): boolean {
-  return extractDateISO(msg) !== null;
 }
 
 const CAL_CATEGORY: Record<string, string> = {
@@ -173,9 +87,10 @@ function inferCalCategory(title: string): string {
 
 function buildCalendarEvent(
   activity: { title: string; category: string },
-  msg: string
+  msg: string,
+  tzOffsetMin: number
 ): CalEvent | null {
-  const start_time = extractDateISO(msg);
+  const start_time = extractDateISO(msg, tzOffsetMin);
   if (!start_time) return null;
   const category = inferCalCategory(activity.title) || CAL_CATEGORY[activity.category] || "general";
   return {
@@ -191,40 +106,6 @@ function buildCalendarEvent(
 
 function cap(s: string): string {
   return s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : s;
-}
-
-// A friendly human phrase for any date/time in the message:
-// "tomorrow", "Friday", "Friday at 2:00 PM", "June 22", or null if none.
-function friendlyWhen(msg: string): string | null {
-  const lower = msg.toLowerCase();
-  const iso = extractDateISO(msg);
-  if (!iso) {
-    if (/\bnext week\b/.test(lower)) return "next week";
-    if (/\bthis week\b/.test(lower)) return "this week";
-    return null;
-  }
-  const date = new Date(iso);
-  let dayLabel: string;
-  if (TOMORROW_RE.test(lower)) dayLabel = "tomorrow";
-  else if (TODAY_RE.test(lower)) dayLabel = "today";
-  else {
-    const diff = Math.round((date.getTime() - Date.now()) / 86400000);
-    dayLabel = diff >= 0 && diff < 7
-      ? date.toLocaleDateString("en-US", { weekday: "long" })
-      : date.toLocaleDateString("en-US", { month: "long", day: "numeric" });
-  }
-  const hasTime = /\b\d{1,2}(?::\d{2})?\s*(?:am|pm)\b|\bnoon\b|\bmidnight\b/i.test(msg);
-  return hasTime
-    ? `${dayLabel} at ${date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`
-    : dayLabel;
-}
-
-// Prefix a "when" phrase with the right preposition: relative phrases
-// ("tomorrow", "this week") take none; named days/dates take "on".
-function whenPhrase(w: string | null): string {
-  if (!w) return "";
-  if (/^(today|tonight|tomorrow|this week|next week)\b/i.test(w)) return ` ${w}`;
-  return ` on ${w}`;
 }
 
 // A recurring cadence phrase ("every Monday", "every morning", "weekly"), or null.
@@ -293,7 +174,7 @@ function appointmentType(msg: string): string {
 
 // ─── Intent detection ─────────────────────────────────────────────────────────
 
-function detectIntent(msg: string, history: Message[]): string {
+function detectIntent(msg: string, history: Message[], tzOffsetMin = 0): string {
   const lower = msg.toLowerCase().trim();
   const recent = history.slice(-3).map(m => m.content.toLowerCase()).join(" ");
 
@@ -365,7 +246,7 @@ function detectIntent(msg: string, history: Message[]): string {
   // Generic calendar event — any message that references a date/day.
   // Questions, greetings, and thanks are matched and returned above, so
   // by here a date reference almost always means "put this on my calendar".
-  if (hasDateLike(msg))
+  if (hasDateLike(msg, tzOffsetMin))
     return "add_to_calendar";
 
   return "general";
@@ -376,11 +257,12 @@ function detectIntent(msg: string, history: Message[]): string {
 function generateResponse(
   intent: string,
   msg: string,
-  ctx: FamilyContext
+  ctx: FamilyContext,
+  tzOffsetMin = 0
 ): { reply: string; activity?: { title: string; category: string; status: string } } {
 
   const day = extractDay(msg);
-  const when = friendlyWhen(msg);
+  const when = friendlyWhen(msg, tzOffsetMin);
   const recurrence = extractRecurrence(msg);
   const members = ctx.members.map(m => m.name);
   const person = extractPerson(msg, members);
@@ -415,12 +297,12 @@ function generateResponse(
       return { reply: `I don't have live weather data, but ${ctx.neighborhood} in Austin typically runs hot and sunny this time of year. Check your phone for the exact forecast — want me to set a reminder before any outdoor plans?` };
 
     case "time_date": {
-      const now = new Date();
-      return { reply: `It's ${now.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}, ${now.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}. Anything time-sensitive I can help with?` };
+      const now = formatUserNow(tzOffsetMin);
+      return { reply: `It's ${now.date}, ${now.time}. Anything time-sensitive I can help with?` };
     }
 
     case "greeting": {
-      const h = new Date().getHours();
+      const h = new Date(Date.now() - tzOffsetMin * 60000).getUTCHours(); // user-local hour
       const greet = h < 12 ? "Good morning" : h < 17 ? "Hey" : "Good evening";
       return { reply: members.length > 0
         ? `${greet}! What's on the ${ctx.name} agenda today?`
@@ -604,9 +486,15 @@ function generateResponse(
 // ─── Route handler ────────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
-  const { message, familyId, context } = await req.json();
+  const { message, familyId, context, tzOffset } = await req.json();
   if (!message || !familyId)
     return NextResponse.json({ error: "Missing message or familyId" }, { status: 400 });
+
+  // Browser's getTimezoneOffset(): minutes to ADD to local time to reach UTC.
+  // Without it dates are computed in server time (UTC on Vercel).
+  const tz = typeof tzOffset === "number" && Number.isFinite(tzOffset) && Math.abs(tzOffset) <= 900
+    ? Math.round(tzOffset)
+    : 0;
 
   // Preview mode — no Supabase. Use the profile the client passes from localStorage.
   if (familyId === "preview") {
@@ -618,9 +506,9 @@ export async function POST(req: NextRequest) {
       members: Array.isArray(provided.members) ? provided.members : [],
       preferences: null,
     };
-    const intent = detectIntent(message, []);
-    const { reply, activity } = generateResponse(intent, message, ctx);
-    const calEvent = activity ? buildCalendarEvent(activity, message) : null;
+    const intent = detectIntent(message, [], tz);
+    const { reply, activity } = generateResponse(intent, message, ctx, tz);
+    const calEvent = activity ? buildCalendarEvent(activity, message, tz) : null;
 
     // Use Claude for the reply when an API key is configured; otherwise fall back.
     const smart = await generateSmartReply(message, ctx, [], {
@@ -629,8 +517,10 @@ export async function POST(req: NextRequest) {
     });
     const finalReply = smart ?? (calEvent ? `${reply} I've added it to your calendar.` : reply);
 
+    // Awaited: fire-and-forget promises can be cut off when the serverless
+    // function freezes after the response is sent.
     if (activity) {
-      void sendTaskNotification({
+      await sendTaskNotification({
         userMessage: message,
         kinReply: finalReply,
         taskTitle: activity.title,
@@ -680,16 +570,31 @@ export async function POST(req: NextRequest) {
   });
 
   // Generate response
-  const intent = detectIntent(message, history);
-  const { reply, activity } = generateResponse(intent, message, ctx);
-  const calEvent = activity ? buildCalendarEvent(activity, message) : null;
+  const intent = detectIntent(message, history, tz);
+  const { reply, activity } = generateResponse(intent, message, ctx, tz);
+  const calEvent = activity ? buildCalendarEvent(activity, message, tz) : null;
+
+  // Create the calendar event BEFORE composing the reply, so "I've added it
+  // to your calendar" is only ever said when the row actually saved.
+  let savedEvent: CalEvent | null = null;
+  if (calEvent) {
+    const { error: eventError } = await supabase.from("events").insert({
+      family_id: familyId,
+      title: calEvent.title,
+      start_time: calEvent.start_time,
+      category: calEvent.category,
+      color: calEvent.color,
+    });
+    if (eventError) console.error("[chat] calendar event insert failed:", eventError.message, eventError);
+    else savedEvent = calEvent;
+  }
 
   // Use Claude for the reply when an API key is configured; otherwise fall back.
   const smart = await generateSmartReply(message, ctx, history, {
-    calendarEvent: calEvent ? { title: calEvent.title, start_time: calEvent.start_time } : null,
+    calendarEvent: savedEvent ? { title: savedEvent.title, start_time: savedEvent.start_time } : null,
     activity: activity ?? null,
   });
-  const finalReply = smart ?? (calEvent ? `${reply} I've added it to your calendar.` : reply);
+  const finalReply = smart ?? (savedEvent ? `${reply} I've added it to your calendar.` : reply);
 
   // Save assistant message
   const { data: assistantMsg } = await supabase
@@ -700,15 +605,18 @@ export async function POST(req: NextRequest) {
 
   // Log activity for task intents
   if (activity) {
-    await supabase.from("activities").insert({
+    const { error: activityError } = await supabase.from("activities").insert({
       family_id: familyId,
       title: activity.title,
       category: activity.category,
       status: activity.status,
       description: message,
     });
+    if (activityError) console.error("[chat] activity insert failed:", activityError.message);
 
-    void sendTaskNotification(
+    // Awaited: fire-and-forget promises can be cut off when the serverless
+    // function freezes after the response is sent.
+    await sendTaskNotification(
       {
         userMessage: message,
         kinReply: finalReply,
@@ -720,16 +628,5 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Create calendar event when a specific day was mentioned
-  if (calEvent) {
-    await supabase.from("events").insert({
-      family_id: familyId,
-      title: calEvent.title,
-      start_time: calEvent.start_time,
-      category: calEvent.category,
-      color: calEvent.color,
-    });
-  }
-
-  return NextResponse.json({ reply: finalReply, message: assistantMsg, ...(calEvent ? { event: calEvent } : {}) });
+  return NextResponse.json({ reply: finalReply, message: assistantMsg, ...(savedEvent ? { event: savedEvent } : {}) });
 }

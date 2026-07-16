@@ -84,7 +84,13 @@ export function ChatInterface({ familyId, initialMessages }: ChatInterfaceProps)
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text.trim(), familyId, context }),
+        body: JSON.stringify({
+          message: text.trim(),
+          familyId,
+          context,
+          // Lets the server compute "today"/"tomorrow" in the user's timezone
+          tzOffset: new Date().getTimezoneOffset(),
+        }),
       });
 
       const data = await res.json();
