@@ -7,17 +7,42 @@
 // shift → compute-with-UTC-accessors → unshift technique so day arithmetic
 // happens on the user's wall clock regardless of server timezone.
 
-// Texting shorthand for "tomorrow" / "today" so casual typing still works.
-export const TOMORROW_RE = /\b(tomorrow|tomorow|tommorow|tommorrow|tomoro|tomorro|tmrw|tmrrw|tmmr|tmr|tmw|tomo|tomm|2moro|2morrow)\b/i;
-export const TODAY_RE = /\b(today|tonight|tonite|2day)\b/i;
+// Texting shorthand and typos for "tomorrow" / "today" so casual typing still
+// works. The t+o+m+o+r+o*w* form tolerates any letter repetition (tomorrrow,
+// tommorrow, tomorow, ...) rather than enumerating misspellings.
+export const TOMORROW_RE = /\b(t+o+m+o+r+o*w*|tmrw|tmrrw|tmmr|tmr|tmw|tomo|tomm|2+m+o+r+o+w*|2morrow)\b/i;
+export const TODAY_RE = /\b(t+o+d+a+y+|tonight|tonite|2day)\b/i;
+
+// Common weekday misspellings, normalized before any matching.
+const DAY_TYPOS: [RegExp, string][] = [
+  [/\b(wensday|wendsday|wednsday|wednesay|wedensday)\b/gi, "wednesday"],
+  [/\b(tusday|teusday|tuseday|tuesdy)\b/gi, "tuesday"],
+  [/\b(thurday|thrusday|thursady|thusday)\b/gi, "thursday"],
+  [/\b(firday|fridy|freeday)\b/gi, "friday"],
+  [/\b(staurday|satruday|saterday|sautrday)\b/gi, "saturday"],
+  [/\b(mondey|munday|mondy)\b/gi, "monday"],
+  [/\b(sundey|sundy)\b/gi, "sunday"],
+];
+
+export function normalizeDays(s: string): string {
+  let out = s;
+  for (const [re, fix] of DAY_TYPOS) out = out.replace(re, fix);
+  return out;
+}
 
 const MONTHS_ABBR = ["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"];
 const MS_MIN = 60000;
 
+// Did the message name an explicit clock time ("2pm", "14:30", "noon")?
+export function hasExplicitTime(msg: string): boolean {
+  return /\b\d{1,2}(?::\d{2})?\s*(?:am|pm)\b|\bnoon\b|\bmidnight\b/i.test(msg);
+}
+
 export function extractDay(msg: string): string | null {
-  if (TOMORROW_RE.test(msg)) return "tomorrow";
-  if (TODAY_RE.test(msg)) return "today";
-  const m = msg.match(/(monday|tuesday|wednesday|thursday|friday|saturday|sunday|this week|next week)/i);
+  const normalized = normalizeDays(msg);
+  if (TOMORROW_RE.test(normalized)) return "tomorrow";
+  if (TODAY_RE.test(normalized)) return "today";
+  const m = normalized.match(/(monday|tuesday|wednesday|thursday|friday|saturday|sunday|this week|next week)/i);
   return m ? m[1] : null;
 }
 
@@ -46,13 +71,24 @@ function unshift(d: Date, tzOffsetMin: number): string {
 
 // Parse any date reference in a freeform message into an ISO datetime, or null.
 export function extractDateISO(msg: string, tzOffsetMin = 0): string | null {
-  const lower = msg.toLowerCase();
+  const lower = normalizeDays(msg.toLowerCase());
   const [hh, mm] = extractTime(msg).split(":").map(Number);
   const now = shiftedNow(tzOffsetMin);
   const at = (d: Date) => { d.setUTCHours(hh, mm, 0, 0); return unshift(d, tzOffsetMin); };
 
   if (TOMORROW_RE.test(lower)) { const d = new Date(now); d.setUTCDate(d.getUTCDate() + 1); return at(d); }
-  if (TODAY_RE.test(lower)) return at(new Date(now));
+  if (TODAY_RE.test(lower)) {
+    const d = new Date(now);
+    d.setUTCHours(hh, mm, 0, 0);
+    // "today" with no stated time, said after the default hour has passed:
+    // aim for the next full hour instead of creating an already-past event.
+    if (!hasExplicitTime(msg) && d <= now) {
+      d.setTime(now.getTime());
+      d.setUTCMinutes(0, 0, 0);
+      d.setUTCHours(d.getUTCHours() + 1);
+    }
+    return unshift(d, tzOffsetMin);
+  }
 
   // Weekday (optionally preceded by "next")
   const days = ["sunday","monday","tuesday","wednesday","thursday","friday","saturday"];
@@ -117,7 +153,7 @@ export function hasDateLike(msg: string, tzOffsetMin = 0): boolean {
 // A friendly human phrase for any date/time in the message, in the user's
 // timezone: "tomorrow", "Friday", "Friday at 2:00 PM", "June 22", or null.
 export function friendlyWhen(msg: string, tzOffsetMin = 0): string | null {
-  const lower = msg.toLowerCase();
+  const lower = normalizeDays(msg.toLowerCase());
   const iso = extractDateISO(msg, tzOffsetMin);
   if (!iso) {
     if (/\bnext week\b/.test(lower)) return "next week";
@@ -135,8 +171,7 @@ export function friendlyWhen(msg: string, tzOffsetMin = 0): string | null {
       ? wall.toLocaleDateString("en-US", { weekday: "long", timeZone: "UTC" })
       : wall.toLocaleDateString("en-US", { month: "long", day: "numeric", timeZone: "UTC" });
   }
-  const hasTime = /\b\d{1,2}(?::\d{2})?\s*(?:am|pm)\b|\bnoon\b|\bmidnight\b/i.test(msg);
-  return hasTime
+  return hasExplicitTime(msg)
     ? `${dayLabel} at ${wall.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "UTC" })}`
     : dayLabel;
 }

@@ -5,6 +5,7 @@ import { generateSmartReply } from "@/lib/ai";
 import {
   TOMORROW_RE,
   TODAY_RE,
+  normalizeDays,
   extractDay,
   extractDateISO,
   hasDateLike,
@@ -142,7 +143,7 @@ function extractPerson(msg: string, members: string[]): string | null {
 // Strip every date/time form (days, dates, ordinals, times) from a phrase
 // so it doesn't read redundantly alongside a separate "when".
 function stripWhen(s: string): string {
-  return s
+  return normalizeDays(s)
     .replace(TOMORROW_RE, "").replace(TODAY_RE, "")
     // recurrence phrases first, so "every monday" is removed as a unit
     .replace(/\bevery\s+other\s+week\b/gi, "")
