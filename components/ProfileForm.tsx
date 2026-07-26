@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, Trash2, User, Home, Settings2 } from "lucide-react";
+import { Plus, Trash2, User, Home, Settings2, Mail } from "lucide-react";
 
 interface Family {
   id: string;
@@ -78,6 +78,26 @@ export function ProfileForm({ family, members: initialMembers, preferences: init
   const [savingFamily, setSavingFamily] = useState(false);
   const [savingPrefs, setSavingPrefs] = useState(false);
   const [saved, setSaved] = useState<string | null>(null);
+  const [testingReminder, setTestingReminder] = useState(false);
+  const [reminderResult, setReminderResult] = useState<{ ok: boolean; message: string } | null>(null);
+
+  async function sendTestReminder() {
+    setTestingReminder(true);
+    setReminderResult(null);
+    try {
+      const res = await fetch("/api/reminders/test", { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      setReminderResult(
+        data.ok
+          ? { ok: true, message: `Sent to ${data.sentTo} — ${data.eventCount} item${data.eventCount === 1 ? "" : "s"}. Check your inbox (and spam).` }
+          : { ok: false, message: data.error || "Couldn't send the test reminder." }
+      );
+    } catch {
+      setReminderResult({ ok: false, message: "Couldn't reach the server. Try again." });
+    } finally {
+      setTestingReminder(false);
+    }
+  }
 
   async function saveFamily() {
     setSavingFamily(true);
@@ -337,7 +357,9 @@ export function ProfileForm({ family, members: initialMembers, preferences: init
           <div className="flex items-center justify-between py-1">
             <div>
               <p className="text-sm text-text-primary">Smart reminders</p>
-              <p className="text-xs text-text-muted">Kin sends proactive reminders</p>
+              <p className="text-xs text-text-muted">
+                A daily email each morning with what&apos;s coming up
+              </p>
             </div>
             <button
               onClick={() => setReminders(!reminders)}
@@ -352,6 +374,30 @@ export function ProfileForm({ family, members: initialMembers, preferences: init
               />
             </button>
           </div>
+
+          {!isPreview && (
+            <div className="pt-1">
+              <button
+                onClick={sendTestReminder}
+                disabled={testingReminder}
+                className="flex items-center gap-2 text-xs text-text-secondary hover:text-text-primary bg-surface-2 hover:bg-surface-3 border border-border rounded-lg px-3 py-2 transition-colors disabled:opacity-50"
+              >
+                <Mail size={13} />
+                {testingReminder ? "Sending…" : "Send me a test reminder"}
+              </button>
+              {reminderResult && (
+                <p
+                  className={`mt-2 text-xs rounded-lg px-3 py-2 border ${
+                    reminderResult.ok
+                      ? "text-teal bg-teal/10 border-teal/20"
+                      : "text-amber-400 bg-amber-400/10 border-amber-400/20"
+                  }`}
+                >
+                  {reminderResult.message}
+                </p>
+              )}
+            </div>
+          )}
 
           <SaveButton
             onClick={savePreferences}

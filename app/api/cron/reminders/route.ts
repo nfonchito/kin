@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendReminderEmail, type ReminderEvent } from "@/lib/email";
+import { reminderWindow, LOOKAHEAD_HOURS } from "@/lib/reminders";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
-
-const LOOKAHEAD_HOURS = 24;
 
 interface EventRow extends ReminderEvent {
   family_id: string;
@@ -35,14 +34,13 @@ export async function GET(req: NextRequest) {
   }
 
   const dryRun = req.nextUrl.searchParams.get("dry") === "1";
-  const now = new Date();
-  const until = new Date(now.getTime() + LOOKAHEAD_HOURS * 3600 * 1000);
+  const { now, until } = reminderWindow();
 
   const { data: events, error: eventsError } = await admin
     .from("events")
     .select("family_id, title, start_time, category")
-    .gte("start_time", now.toISOString())
-    .lte("start_time", until.toISOString())
+    .gte("start_time", now)
+    .lte("start_time", until)
     .order("start_time", { ascending: true });
 
   if (eventsError) {
