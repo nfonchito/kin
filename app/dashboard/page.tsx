@@ -3,6 +3,7 @@ import { ChatInterface } from "@/components/ChatInterface";
 import { ActivityFeed } from "@/components/ActivityFeed";
 import { UpcomingEvents } from "@/components/UpcomingEvents";
 import { PreviewGreeting } from "@/components/PreviewGreeting";
+import { TodayLabel } from "@/components/TodayLabel";
 
 const IS_PREVIEW = !process.env.NEXT_PUBLIC_SUPABASE_URL ||
   process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder");
@@ -12,9 +13,17 @@ export default async function DashboardPage() {
     return (
       <div className="flex flex-col lg:flex-row h-full min-h-[calc(100vh-56px)] lg:min-h-screen">
         <div className="flex-1 flex flex-col min-h-[60vh] lg:min-h-0">
-          <div className="px-5 pt-6 pb-4 border-b border-border">
-            <PreviewGreeting />
-            <p className="text-sm text-text-secondary mt-0.5">What can Kin help with today?</p>
+          <div className="relative px-5 pt-6 pb-5 border-b border-border overflow-hidden">
+            <div
+              aria-hidden
+              className="pointer-events-none absolute -top-24 -left-16 w-72 h-48 rounded-full opacity-[0.07] blur-3xl"
+              style={{ background: "radial-gradient(circle, #15c489 0%, transparent 70%)" }}
+            />
+            <div className="relative">
+              <TodayLabel className="mb-1.5" />
+              <PreviewGreeting />
+              <p className="text-sm text-text-secondary mt-1">What can Kin help with today?</p>
+            </div>
           </div>
           <div className="flex-1 overflow-hidden">
             <ChatInterface familyId="preview" initialMessages={[]} />
@@ -65,11 +74,20 @@ export default async function DashboardPage() {
   return (
     <div className="flex flex-col lg:flex-row h-full min-h-[calc(100vh-56px)] lg:min-h-screen">
       <div className="flex-1 flex flex-col min-h-[60vh] lg:min-h-0">
-        <div className="px-5 pt-6 pb-4 border-b border-border">
-          <h1 className="text-lg font-semibold text-text-primary">
-            Hey, {family?.name ?? "there"} 👋
-          </h1>
-          <p className="text-sm text-text-secondary mt-0.5">What can Kin help with today?</p>
+        <div className="relative px-5 pt-6 pb-5 border-b border-border overflow-hidden">
+          {/* soft teal wash, echoes the landing page hero */}
+          <div
+            aria-hidden
+            className="pointer-events-none absolute -top-24 -left-16 w-72 h-48 rounded-full opacity-[0.07] blur-3xl"
+            style={{ background: "radial-gradient(circle, #15c489 0%, transparent 70%)" }}
+          />
+          <div className="relative">
+            <TodayLabel className="mb-1.5" />
+            <h1 className="text-xl font-semibold text-text-primary tracking-tight">
+              Hey, {family?.name ?? "there"} 👋
+            </h1>
+            <p className="text-sm text-text-secondary mt-1">What can Kin help with today?</p>
+          </div>
         </div>
         <div className="flex-1 overflow-hidden">
           <ChatInterface familyId={family?.id} initialMessages={messages ?? []} />

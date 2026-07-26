@@ -43,6 +43,32 @@ body {
   outline-offset: 2px;
 }
 
+/* No grey/blue flash when tapping on mobile */
+button,
+a,
+[role="button"] {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* iOS Safari zooms the page in when focusing an input under 16px. Bump the
+   form controls on small screens so tapping a field doesn't jerk the layout.
+   !important because Tailwind's text-sm is a class and would otherwise win. */
+@media (max-width: 1023px) {
+  input,
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}
+
+/* Subtle press feedback on primary actions */
+.press {
+  transition: transform 120ms ease;
+}
+.press:active:not(:disabled) {
+  transform: scale(0.975);
+}
+
 /* Selection */
 ::selection {
   background: rgba(21, 196, 137, 0.2);

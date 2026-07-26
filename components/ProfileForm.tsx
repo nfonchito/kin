@@ -186,7 +186,7 @@ export function ProfileForm({ family, members: initialMembers, preferences: init
   }
 
   return (
-    <div className="space-y-6 pb-20 lg:pb-6">
+    <div className="space-y-6 pb-6">
       {/* Family section */}
       <Section icon={Home} title="Family details">
         <div className="space-y-3">

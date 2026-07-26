@@ -17,7 +17,8 @@ export default async function DashboardLayout({
         <Sidebar family={null} userEmail="" />
         <main className="flex-1 overflow-auto lg:ml-0">
           <MobileNav family={null} userEmail="" />
-          <div className="min-h-full">{children}</div>
+          {/* pb clears the fixed mobile tab bar so the last row isn't cut off */}
+          <div className="min-h-full pb-16 lg:pb-0">{children}</div>
         </main>
       </div>
     );

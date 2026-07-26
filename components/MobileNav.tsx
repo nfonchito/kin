@@ -59,7 +59,10 @@ export function MobileNav({ family }: MobileNavProps) {
       </header>
 
       {/* Mobile bottom tab bar */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-20 bg-surface border-t border-border flex">
+      <nav
+        className="lg:hidden fixed bottom-0 left-0 right-0 z-20 bg-surface/95 backdrop-blur border-t border-border flex"
+        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+      >
         {nav.map(({ href, label, icon: Icon }) => {
           const active = pathname === href;
           return (

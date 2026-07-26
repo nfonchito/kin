@@ -130,9 +130,17 @@ export function UpcomingEvents({ events: initialEvents, familyId }: UpcomingEven
   return (
     <div className="border-b border-border">
       <div className="flex items-center justify-between px-4 pt-4 pb-3">
-        <h2 className="text-sm font-semibold text-text-primary">Upcoming</h2>
+        <div className="flex items-center gap-2">
+          <h2 className="text-sm font-semibold text-text-primary">Upcoming</h2>
+          {events.length > 0 && (
+            <span className="text-[10px] font-medium text-teal bg-teal-muted rounded-full px-1.5 py-0.5 leading-none">
+              {events.length}
+            </span>
+          )}
+        </div>
         <button
           onClick={() => setShowForm(!showForm)}
+          title="Add an event"
           className="p-1 text-text-muted hover:text-teal transition-colors rounded-md hover:bg-teal-subtle"
         >
           <Plus size={14} />

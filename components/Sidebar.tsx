@@ -69,12 +69,15 @@ export function Sidebar({ family, userEmail }: SidebarProps) {
             <Link
               key={href}
               href={href}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${
+              className={`relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-150 ${
                 active
                   ? "bg-teal-muted text-teal font-medium"
                   : "text-text-secondary hover:text-text-primary hover:bg-surface-3"
               }`}
             >
+              {active && (
+                <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[3px] rounded-r-full bg-teal" />
+              )}
               <Icon size={16} strokeWidth={active ? 2.2 : 1.8} />
               {label}
             </Link>

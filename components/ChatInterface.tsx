@@ -291,7 +291,7 @@ export function ChatInterface({ familyId, initialMessages }: ChatInterfaceProps)
           <button
             onClick={() => sendMessage(input)}
             disabled={!input.trim() || loading}
-            className="shrink-0 p-1.5 bg-teal hover:bg-teal-dim text-bg rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="press shrink-0 p-2 bg-teal hover:bg-teal-dim text-bg rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <Send size={14} />
           </button>
@@ -320,8 +320,8 @@ function MessageBubble({ message }: { message: Message }) {
         <div
           className={`px-4 py-3 rounded-2xl text-sm leading-relaxed ${
             isUser
-              ? "bg-teal text-bg rounded-br-sm font-medium"
-              : "bg-surface-2 text-text-primary border border-border rounded-bl-sm"
+              ? "bg-teal text-bg rounded-br-sm font-medium shadow-sm shadow-teal/20"
+              : "bg-surface-2 text-text-primary border border-border rounded-bl-sm shadow-sm shadow-black/20"
           }`}
         >
           {message.content}
