@@ -1,9 +1,12 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Send, Sparkles } from "lucide-react";
+import { Send, Sparkles, Trash2, RotateCcw } from "lucide-react";
 import { KinLogo } from "./KinLogo";
 import { format } from "date-fns";
+
+// How long the "Undo" stays available after clearing.
+const UNDO_WINDOW_MS = 12000;
 
 interface Message {
   id: string;
@@ -28,8 +31,13 @@ export function ChatInterface({ familyId, initialMessages }: ChatInterfaceProps)
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [clearing, setClearing] = useState(false);
+  // Messages held aside after a clear so "Undo" can put them back.
+  const [cleared, setCleared] = useState<Message[] | null>(null);
+  const [clearError, setClearError] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -128,6 +136,72 @@ export function ChatInterface({ familyId, initialMessages }: ChatInterfaceProps)
     }
   }
 
+  // Don't leave a timer running if the chat unmounts mid-undo-window
+  useEffect(() => () => { if (undoTimer.current) clearTimeout(undoTimer.current); }, []);
+
+  function startUndoWindow(backup: Message[]) {
+    setCleared(backup);
+    if (undoTimer.current) clearTimeout(undoTimer.current);
+    undoTimer.current = setTimeout(() => setCleared(null), UNDO_WINDOW_MS);
+  }
+
+  async function clearChat() {
+    if (messages.length === 0 || clearing) return;
+    const backup = messages;
+    setClearing(true);
+    setClearError("");
+
+    try {
+      if (familyId === "preview") {
+        localStorage.removeItem("kin_chat_messages");
+      } else {
+        const res = await fetch("/api/messages", { method: "DELETE" });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || "Couldn't clear the chat");
+        }
+      }
+      setMessages([]);
+      startUndoWindow(backup);
+    } catch (e) {
+      setClearError(e instanceof Error ? e.message : "Couldn't clear the chat");
+    } finally {
+      setClearing(false);
+    }
+  }
+
+  async function undoClear() {
+    if (!cleared || clearing) return;
+    const backup = cleared;
+    if (undoTimer.current) clearTimeout(undoTimer.current);
+    setCleared(null);
+    setClearing(true);
+    setClearError("");
+
+    try {
+      if (familyId === "preview") {
+        localStorage.setItem("kin_chat_messages", JSON.stringify(backup));
+        setMessages(backup);
+      } else {
+        const res = await fetch("/api/messages", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            messages: backup.map(({ role, content, created_at }) => ({ role, content, created_at })),
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || "Couldn't restore the chat");
+        setMessages(Array.isArray(data.restored) && data.restored.length ? data.restored : backup);
+      }
+    } catch (e) {
+      setClearError(e instanceof Error ? e.message : "Couldn't restore the chat");
+      setCleared(backup); // keep Undo on screen so they can retry
+    } finally {
+      setClearing(false);
+    }
+  }
+
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -137,6 +211,21 @@ export function ChatInterface({ familyId, initialMessages }: ChatInterfaceProps)
 
   return (
     <div className="flex flex-col h-full">
+      {/* Clear chat */}
+      {messages.length > 0 && (
+        <div className="flex justify-end px-4 pt-3 shrink-0">
+          <button
+            onClick={clearChat}
+            disabled={clearing}
+            title="Clear this conversation"
+            className="flex items-center gap-1.5 text-xs text-text-muted hover:text-text-secondary transition-colors disabled:opacity-50"
+          >
+            <Trash2 size={12} />
+            {clearing ? "Clearing…" : "Clear chat"}
+          </button>
+        </div>
+      )}
+
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
         {messages.length === 0 ? (
@@ -154,6 +243,26 @@ export function ChatInterface({ familyId, initialMessages }: ChatInterfaceProps)
 
       {/* Input */}
       <div className="px-4 py-3 border-t border-border bg-bg">
+        {cleared && (
+          <div className="flex items-center justify-between gap-3 mb-3 px-3 py-2 bg-surface-2 border border-border rounded-xl animate-slide-up">
+            <span className="text-xs text-text-secondary">Conversation cleared.</span>
+            <button
+              onClick={undoClear}
+              disabled={clearing}
+              className="flex items-center gap-1.5 text-xs font-medium text-teal hover:text-teal-dim transition-colors disabled:opacity-50"
+            >
+              <RotateCcw size={12} />
+              Undo
+            </button>
+          </div>
+        )}
+
+        {clearError && (
+          <p className="mb-3 text-xs text-red-400 bg-red-400/10 border border-red-400/20 rounded-lg px-3 py-2">
+            {clearError}
+          </p>
+        )}
+
         {messages.length === 0 && (
           <div className="flex flex-wrap gap-2 mb-3">
             {SUGGESTIONS.map((s) => (
