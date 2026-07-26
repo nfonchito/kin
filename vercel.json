@@ -7,5 +7,11 @@
     "env": {
       "ESLINT_USE_FLAT_CONFIG": "false"
     }
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/cron/reminders",
+      "schedule": "0 13 * * *"
+    }
+  ]
 }

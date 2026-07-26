@@ -73,6 +73,81 @@ export async function sendTaskNotification(
   return res;
 }
 
+export interface ReminderEvent {
+  title: string;
+  start_time: string;
+  category?: string | null;
+}
+
+// Families are Austin-based today and we don't store a per-family timezone
+// yet, so reminder times are rendered in Central.
+const REMINDER_TZ = process.env.KIN_DEFAULT_TZ || "America/Chicago";
+
+function formatEventTime(iso: string): string {
+  const d = new Date(iso);
+  const day = d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: REMINDER_TZ });
+  const time = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: REMINDER_TZ });
+  return `${day} · ${time}`;
+}
+
+// The scheduled nudge: what's coming up for this family in the next day.
+export async function sendReminderEmail(opts: {
+  to: string;
+  familyName?: string | null;
+  events: ReminderEvent[];
+}): Promise<SendResult> {
+  const { to, familyName, events } = opts;
+  if (events.length === 0) return { ok: false, error: "No events to remind about" };
+
+  const heading = events.length === 1 ? "1 thing coming up" : `${events.length} things coming up`;
+
+  const rows = events
+    .map(
+      (e) => `
+        <tr>
+          <td style="padding: 12px 16px; border-bottom: 1px solid #eee; font-size: 15px; color: #111;">
+            ${escapeHtml(e.title)}
+          </td>
+          <td style="padding: 12px 16px; border-bottom: 1px solid #eee; font-size: 14px; color: #555; white-space: nowrap; text-align: right;">
+            ${escapeHtml(formatEventTime(e.start_time))}
+          </td>
+        </tr>`
+    )
+    .join("");
+
+  const html = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+                max-width: 560px; margin: 0 auto; padding: 32px 24px; color: #111;">
+      <p style="margin: 0 0 4px; font-size: 13px; color: #15c489; font-weight: 600;
+                letter-spacing: 0.05em; text-transform: uppercase;">Kin Family Assistant</p>
+      <h1 style="margin: 0 0 6px; font-size: 20px; font-weight: 700;">${escapeHtml(heading)}</h1>
+      <p style="margin: 0 0 24px; font-size: 15px; color: #555;">
+        ${familyName ? `Here's what's ahead for ${escapeHtml(familyName)}` : "Here's what's ahead"} in the next 24 hours.
+      </p>
+
+      <table style="width: 100%; border-collapse: collapse; background: #f9f9f9; border-radius: 8px; overflow: hidden;">
+        ${rows}
+      </table>
+
+      <p style="margin: 24px 0 0;">
+        <a href="https://kinfamily.app/dashboard/calendar"
+           style="display: inline-block; background: #15c489; color: #06231a; text-decoration: none;
+                  font-weight: 600; font-size: 14px; padding: 10px 18px; border-radius: 10px;">
+          Open your calendar
+        </a>
+      </p>
+
+      <p style="margin: 28px 0 0; font-size: 12px; color: #aaa;">
+        You're getting this because these are on your Kin calendar.
+      </p>
+    </div>
+  `;
+
+  const res = await send(`Kin · ${heading}`, html, to);
+  if (!res.ok) console.error("[email] reminder failed:", res.error);
+  return res;
+}
+
 export async function sendTestEmail(): Promise<SendResult> {
   return send(
     "Kin · Test notification",
