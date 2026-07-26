@@ -40,7 +40,11 @@ export function ChatInterface({ familyId, initialMessages }: ChatInterfaceProps)
   const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    // Nothing to scroll to when the thread is empty — and on mobile an
+    // unconditional scroll drags the page past the greeting header.
+    // block:"nearest" keeps it inside the message list.
+    if (messages.length === 0) return;
+    bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }, [messages]);
 
   // Preview mode: restore the conversation on mount so it survives navigation

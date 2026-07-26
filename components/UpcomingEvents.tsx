@@ -205,10 +205,14 @@ export function UpcomingEvents({ events: initialEvents, familyId }: UpcomingEven
 
       <div className="px-4 pb-4 space-y-1.5">
         {events.length === 0 && !showForm ? (
-          <div className="flex items-center gap-2 py-3 text-sm text-text-muted">
-            <CalendarDays size={14} />
-            <span>No upcoming events</span>
-          </div>
+          <button
+            onClick={() => setShowForm(true)}
+            className="w-full flex flex-col items-center gap-1.5 py-7 px-4 rounded-xl border border-dashed border-border hover:border-teal-subtle hover:bg-teal-subtle/40 transition-colors group"
+          >
+            <CalendarDays size={18} className="text-text-muted group-hover:text-teal transition-colors" />
+            <span className="text-sm text-text-secondary">Nothing scheduled yet</span>
+            <span className="text-xs text-text-muted">Tap to add an event</span>
+          </button>
         ) : (
           events.slice(0, 4).map((event) => {
             const date = new Date(event.start_time);
