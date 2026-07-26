@@ -23,14 +23,6 @@ export interface SendResult {
   error?: string;
 }
 
-export function emailConfig() {
-  return {
-    hasKey: !!process.env.RESEND_API_KEY,
-    recipient: process.env.NOTIFICATION_EMAIL ?? null,
-    from: FROM,
-  };
-}
-
 // Who a notification goes to: the user's own email when provided, else the
 // owner inbox (NOTIFICATION_EMAIL). The owner is bcc'd on user-bound sends so
 // every request stays visible for manual fulfillment.
@@ -146,17 +138,6 @@ export async function sendReminderEmail(opts: {
   const res = await send(`Kin · ${heading}`, html, to);
   if (!res.ok) console.error("[email] reminder failed:", res.error);
   return res;
-}
-
-export async function sendTestEmail(): Promise<SendResult> {
-  return send(
-    "Kin · Test notification",
-    `<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 480px; margin: 0 auto; padding: 32px 24px; color: #111;">
-       <p style="margin: 0 0 4px; font-size: 13px; color: #15c489; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase;">Kin Family Assistant</p>
-       <h1 style="margin: 0 0 12px; font-size: 20px;">✅ Email notifications are working</h1>
-       <p style="margin: 0; font-size: 15px; color: #444;">If you're reading this in your inbox, your Resend setup is configured correctly. Task requests will now be emailed here.</p>
-     </div>`
-  );
 }
 
 function renderTaskHtml(n: TaskNotification): string {
