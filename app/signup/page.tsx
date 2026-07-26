@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { KinLogo } from "@/components/KinLogo";
+import { GoogleSignInButton } from "@/components/GoogleSignInButton";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -96,6 +97,17 @@ export default function SignupPage() {
           <h1 className="text-2xl font-semibold text-text-primary mb-1">Join Kin</h1>
           <p className="text-text-secondary text-sm">Set up your family&apos;s dashboard</p>
         </div>
+
+        {!isPreview && (
+          <>
+            <GoogleSignInButton label="Sign up with Google" />
+            <div className="flex items-center gap-3 my-5">
+              <span className="flex-1 h-px bg-border" />
+              <span className="text-xs text-text-muted">or</span>
+              <span className="flex-1 h-px bg-border" />
+            </div>
+          </>
+        )}
 
         <form onSubmit={handleSignup} className="space-y-4">
           <div>

@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { KinLogo } from "@/components/KinLogo";
+import { GoogleSignInButton } from "@/components/GoogleSignInButton";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -15,6 +16,17 @@ export default function LoginPage() {
 
   const isPreview = !process.env.NEXT_PUBLIC_SUPABASE_URL ||
     process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder");
+
+  // The OAuth callback sends failures back as ?error=… — show them here.
+  // Read from location rather than useSearchParams to avoid needing a
+  // Suspense boundary around this page.
+  useEffect(() => {
+    const message = new URLSearchParams(window.location.search).get("error");
+    if (message) {
+      setError(message);
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, []);
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -56,6 +68,17 @@ export default function LoginPage() {
           <h1 className="text-2xl font-semibold text-text-primary mb-1">Welcome back</h1>
           <p className="text-text-secondary text-sm">Sign in to your family dashboard</p>
         </div>
+
+        {!isPreview && (
+          <>
+            <GoogleSignInButton label="Continue with Google" />
+            <div className="flex items-center gap-3 my-5">
+              <span className="flex-1 h-px bg-border" />
+              <span className="text-xs text-text-muted">or</span>
+              <span className="flex-1 h-px bg-border" />
+            </div>
+          </>
+        )}
 
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
