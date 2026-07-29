@@ -19,6 +19,9 @@ export default function SignupPage() {
   const isPreview = !process.env.NEXT_PUBLIC_SUPABASE_URL ||
     process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder");
 
+  // See login page: hidden until Google OAuth is configured in Supabase.
+  const googleEnabled = process.env.NEXT_PUBLIC_GOOGLE_AUTH_ENABLED === "true";
+
   async function handleSignup(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
@@ -98,7 +101,7 @@ export default function SignupPage() {
           <p className="text-text-secondary text-sm">Set up your family&apos;s dashboard</p>
         </div>
 
-        {!isPreview && (
+        {!isPreview && googleEnabled && (
           <>
             <GoogleSignInButton label="Sign up with Google" />
             <div className="flex items-center gap-3 my-5">

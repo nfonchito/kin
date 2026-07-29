@@ -17,6 +17,11 @@ export default function LoginPage() {
   const isPreview = !process.env.NEXT_PUBLIC_SUPABASE_URL ||
     process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder");
 
+  // Off until Google OAuth is configured in Supabase — a visible button that
+  // errors on click is worse than no button. Set NEXT_PUBLIC_GOOGLE_AUTH_ENABLED
+  // to "true" in Vercel once the provider is live.
+  const googleEnabled = process.env.NEXT_PUBLIC_GOOGLE_AUTH_ENABLED === "true";
+
   // The OAuth callback sends failures back as ?error=… — show them here.
   // Read from location rather than useSearchParams to avoid needing a
   // Suspense boundary around this page.
@@ -69,7 +74,7 @@ export default function LoginPage() {
           <p className="text-text-secondary text-sm">Sign in to your family dashboard</p>
         </div>
 
-        {!isPreview && (
+        {!isPreview && googleEnabled && (
           <>
             <GoogleSignInButton label="Continue with Google" />
             <div className="flex items-center gap-3 my-5">
