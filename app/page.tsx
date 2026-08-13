@@ -67,7 +67,7 @@ export default function HomePage() {
         <div
           aria-hidden
           className="pointer-events-none absolute -left-40 -top-40 w-[680px] h-[680px] rounded-full opacity-[0.16] blur-3xl"
-          style={{ background: "radial-gradient(circle, #f0a93c 0%, transparent 62%)" }}
+          style={{ background: "radial-gradient(circle, #f7cb98 0%, transparent 62%)" }}
         />
         <div className="relative mx-auto max-w-6xl px-6 lg:px-10 pt-20 pb-24 lg:pt-28 lg:pb-32">
           <div className="grid lg:grid-cols-12 gap-14 lg:gap-10 items-center">
@@ -91,7 +91,7 @@ export default function HomePage() {
               <div className="mt-10 flex flex-col sm:flex-row sm:items-center gap-3">
                 <Link
                   href="/signup"
-                  className="press group inline-flex items-center justify-center gap-2.5 bg-accent hover:bg-accent-dim text-bg font-semibold rounded-lg px-7 py-4 text-[15px] transition-colors"
+                  className="press group inline-flex items-center justify-center gap-2.5 bg-accent-soft hover:bg-accent-soft-dim text-text-primary font-semibold rounded-lg px-7 py-4 text-[15px] transition-colors"
                 >
                   Get started free
                   <ArrowRight size={17} className="group-hover:translate-x-1 transition-transform duration-200" />
@@ -116,7 +116,7 @@ export default function HomePage() {
                 </p>
                 <div className="space-y-3.5">
                   <div className="flex justify-end">
-                    <p className="bg-accent text-bg text-sm font-medium rounded-2xl rounded-br-md px-4 py-2.5 max-w-[85%]">
+                    <p className="bg-accent-soft text-text-primary text-sm font-medium rounded-2xl rounded-br-md px-4 py-2.5 max-w-[85%]">
                       lawn care every thursday
                     </p>
                   </div>
@@ -192,7 +192,7 @@ export default function HomePage() {
         <div
           aria-hidden
           className="pointer-events-none absolute right-0 bottom-0 w-[520px] h-[420px] rounded-full opacity-[0.13] blur-3xl"
-          style={{ background: "radial-gradient(circle, #f0a93c 0%, transparent 65%)" }}
+          style={{ background: "radial-gradient(circle, #f7cb98 0%, transparent 65%)" }}
         />
         <div className="relative mx-auto max-w-6xl px-6 lg:px-10 py-24 lg:py-28">
           <div className="grid lg:grid-cols-12 gap-10 items-end">
@@ -209,7 +209,7 @@ export default function HomePage() {
             <div className="lg:col-span-4 lg:text-right">
               <Link
                 href="/signup"
-                className="press group inline-flex items-center gap-2.5 bg-accent hover:bg-accent-dim text-bg font-semibold rounded-lg px-8 py-4 text-[15px] transition-colors"
+                className="press group inline-flex items-center gap-2.5 bg-accent-soft hover:bg-accent-soft-dim text-text-primary font-semibold rounded-lg px-8 py-4 text-[15px] transition-colors"
               >
                 Get started free
                 <ArrowRight size={17} className="group-hover:translate-x-1 transition-transform duration-200" />

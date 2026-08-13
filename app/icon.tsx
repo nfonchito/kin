@@ -16,14 +16,14 @@ export default function Icon() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "#c2610c",
+          background: "#f6bd7c",
           borderRadius: 44,
         }}
       >
         <svg width="120" height="120" viewBox="0 0 40 40" fill="none">
           <path
             d="M12 10v20M12 20l10-10M12 20l10 10"
-            stroke="#fdf6e8"
+            stroke="#4a3a24"
             strokeWidth="3.4"
             strokeLinecap="round"
             strokeLinejoin="round"

@@ -17,7 +17,7 @@ export default async function DashboardPage() {
             <div
               aria-hidden
               className="pointer-events-none absolute -top-28 -left-20 w-96 h-56 rounded-full opacity-[0.13] blur-3xl"
-              style={{ background: "radial-gradient(circle, #f0a93c 0%, transparent 70%)" }}
+              style={{ background: "radial-gradient(circle, #f7cb98 0%, transparent 70%)" }}
             />
             <div className="relative">
               <TodayLabel className="mb-1.5" />
@@ -79,7 +79,7 @@ export default async function DashboardPage() {
           <div
             aria-hidden
             className="pointer-events-none absolute -top-24 -left-16 w-72 h-48 rounded-full opacity-[0.07] blur-3xl"
-            style={{ background: "radial-gradient(circle, #f0a93c 0%, transparent 70%)" }}
+            style={{ background: "radial-gradient(circle, #f7cb98 0%, transparent 70%)" }}
           />
           <div className="relative">
             <TodayLabel className="mb-1.5" />

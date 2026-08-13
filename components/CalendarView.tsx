@@ -196,7 +196,7 @@ export function CalendarView({ events: initialEvents, familyId }: CalendarViewPr
                 <span
                   className={`text-xs font-medium w-6 h-6 flex items-center justify-center rounded-full ${
                     today
-                      ? "bg-accent text-bg"
+                      ? "bg-accent-soft text-text-primary"
                       : isSelected
                       ? "text-accent"
                       : "text-text-secondary"
@@ -280,7 +280,7 @@ export function CalendarView({ events: initialEvents, familyId }: CalendarViewPr
                 <button
                   type="submit"
                   disabled={saving}
-                  className="flex-1 bg-accent hover:bg-accent-dim text-bg text-sm font-medium rounded-lg py-2 transition-colors disabled:opacity-50"
+                  className="flex-1 bg-accent-soft hover:bg-accent-soft-dim text-text-primary text-sm font-medium rounded-lg py-2 transition-colors disabled:opacity-50"
                 >
                   {saving ? "Saving…" : "Save"}
                 </button>

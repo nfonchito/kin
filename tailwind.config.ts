@@ -20,11 +20,18 @@ const config: Config = {
         border: "#ebdec3",      // soft — deliberately low contrast
         "border-2": "#dcc9a4",
         accent: {
-          DEFAULT: "#c2610c",   // deep sunset — readable as text and as a fill
-          dim: "#a04f08",       // hover
-          sun: "#f0a93c",       // light sunset, decorative only (glows, washes)
-          muted: "rgba(194,97,12,0.10)",
-          subtle: "rgba(194,97,12,0.05)",
+          // Deep sunset, reserved for small text, icons and rules where the
+          // colour has to stay legible against paper.
+          DEFAULT: "#c2610c",
+          dim: "#a04f08",
+          // Pastel sunset for the large saturated areas — buttons, bubbles,
+          // the logo tile. These carry dark ink rather than cream, which is
+          // what lets the fill stay this soft.
+          soft: "#f6bd7c",
+          "soft-dim": "#efad63",
+          sun: "#f7cb98",       // decorative only — glows and washes
+          muted: "rgba(194,97,12,0.09)",
+          subtle: "rgba(194,97,12,0.045)",
         },
         text: {
           primary: "#4a3a24",   // warm brown ink

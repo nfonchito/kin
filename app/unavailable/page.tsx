@@ -28,7 +28,7 @@ export default function UnavailablePage() {
 
           <Link
             href="/dashboard"
-            className="mt-6 inline-flex items-center gap-2 bg-accent hover:bg-accent-dim text-bg font-semibold rounded-xl px-5 py-2.5 text-sm transition-colors"
+            className="mt-6 inline-flex items-center gap-2 bg-accent-soft hover:bg-accent-soft-dim text-text-primary font-semibold rounded-xl px-5 py-2.5 text-sm transition-colors"
           >
             <RefreshCw size={14} />
             Try again

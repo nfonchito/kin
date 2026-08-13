@@ -286,7 +286,7 @@ export function ProfileForm({ family, members: initialMembers, preferences: init
                 <button
                   onClick={addMember}
                   disabled={!newMemberName}
-                  className="flex-1 bg-accent hover:bg-accent-dim text-bg text-sm font-medium rounded-lg py-2 transition-colors disabled:opacity-50"
+                  className="flex-1 bg-accent-soft hover:bg-accent-soft-dim text-text-primary text-sm font-medium rounded-lg py-2 transition-colors disabled:opacity-50"
                 >
                   Add
                 </button>
@@ -364,7 +364,7 @@ export function ProfileForm({ family, members: initialMembers, preferences: init
             <button
               onClick={() => setReminders(!reminders)}
               className={`w-10 h-6 rounded-full transition-colors relative ${
-                reminders ? "bg-accent" : "bg-surface-3"
+                reminders ? "bg-accent-soft" : "bg-surface-3"
               }`}
             >
               <span
@@ -446,7 +446,7 @@ function SaveButton({
       className={`text-sm font-medium px-4 py-2 rounded-lg transition-colors ${
         saved
           ? "bg-accent/20 text-accent"
-          : "bg-accent hover:bg-accent-dim text-bg disabled:opacity-50"
+          : "bg-accent-soft hover:bg-accent-soft-dim text-text-primary disabled:opacity-50"
       }`}
     >
       {saved ? "Saved" : loading ? "Saving…" : "Save changes"}

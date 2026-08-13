@@ -188,7 +188,7 @@ export function UpcomingEvents({ events: initialEvents, familyId }: UpcomingEven
             <button
               type="submit"
               disabled={saving}
-              className="flex-1 bg-accent hover:bg-accent-dim text-bg text-sm font-medium rounded-lg py-2 transition-colors disabled:opacity-50"
+              className="flex-1 bg-accent-soft hover:bg-accent-soft-dim text-text-primary text-sm font-medium rounded-lg py-2 transition-colors disabled:opacity-50"
             >
               {saving ? "Adding…" : "Add event"}
             </button>
