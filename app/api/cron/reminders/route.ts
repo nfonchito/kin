@@ -60,22 +60,43 @@ export async function GET(req: NextRequest) {
     byFamily.set(row.family_id, list);
   }
 
-  const { data: families, error: familiesError } = await admin
-    .from("families")
-    .select("id, user_id, name")
-    .in("id", [...byFamily.keys()]);
+  const familyIds = [...byFamily.keys()];
+
+  const [{ data: families, error: familiesError }, { data: prefs, error: prefsError }] =
+    await Promise.all([
+      admin.from("families").select("id, user_id, name").in("id", familyIds),
+      // The Profile toggle writes reminders_enabled; honour it here or the
+      // switch is decorative and we email people who opted out.
+      admin.from("family_preferences").select("family_id, reminders_enabled").in("family_id", familyIds),
+    ]);
 
   if (familiesError) {
     console.error("[cron/reminders] family query failed:", familiesError.message);
     return NextResponse.json({ ok: false, error: familiesError.message }, { status: 500 });
   }
+  if (prefsError) {
+    console.error("[cron/reminders] preferences query failed:", prefsError.message);
+    return NextResponse.json({ ok: false, error: prefsError.message }, { status: 500 });
+  }
+
+  // Default to opted-in: a family with no preferences row hasn't turned
+  // anything off, and reminders are the point of the product.
+  const optedOut = new Set(
+    (prefs ?? []).filter((p) => p.reminders_enabled === false).map((p) => p.family_id)
+  );
 
   let sent = 0;
+  let optedOutCount = 0;
   const skipped: string[] = [];
 
   for (const family of families ?? []) {
     const familyEvents = byFamily.get(family.id) ?? [];
     if (familyEvents.length === 0) continue;
+
+    if (optedOut.has(family.id)) {
+      optedOutCount++;
+      continue;
+    }
 
     const { data: userData, error: userError } = await admin.auth.admin.getUserById(family.user_id);
     const email = userData?.user?.email;
@@ -94,7 +115,7 @@ export async function GET(req: NextRequest) {
     else skipped.push(`${family.id}: ${result.error}`);
   }
 
-  console.log(`[cron/reminders] ${rows.length} events, ${byFamily.size} families, ${sent} sent${dryRun ? " (dry run)" : ""}`);
+  console.log(`[cron/reminders] ${rows.length} events, ${byFamily.size} families, ${sent} sent, ${optedOutCount} opted out${dryRun ? " (dry run)" : ""}`);
 
   return NextResponse.json({
     ok: true,
@@ -102,6 +123,7 @@ export async function GET(req: NextRequest) {
     window: `${LOOKAHEAD_HOURS}h`,
     events: rows.length,
     families: byFamily.size,
+    optedOut: optedOutCount,
     sent,
     ...(skipped.length ? { skipped } : {}),
   });

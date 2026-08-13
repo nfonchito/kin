@@ -318,7 +318,14 @@ function generateResponse(
   const recurrence = extractRecurrence(msg);
   const members = ctx.members.map(m => m.name);
   const person = extractPerson(msg, members);
-  const shortName = ctx.name.replace(/^the\s+/i, "").replace(/s$/i, "");
+  // "The Batlles" -> "Batlle family". Placeholder names like "My Family" or an
+  // unset name already read as a family, so don't append the word again —
+  // that produced "the My Family family".
+  const bare = ctx.name.replace(/^the\s+/i, "").trim();
+  const looksLikeAFamilyName = /\bfamily\b/i.test(bare) || bare.length === 0;
+  const familyPhrase = looksLikeAFamilyName
+    ? "your family"
+    : `${bare.replace(/s$/i, "")} family`;
 
   switch (intent) {
 
@@ -346,7 +353,9 @@ function generateResponse(
       return { reply: `You're the ${ctx.name}, based in ${ctx.neighborhood}. What can I help with?` };
 
     case "weather":
-      return { reply: `I don't have live weather data, but ${ctx.neighborhood} in Austin typically runs hot and sunny this time of year. Check your phone for the exact forecast — want me to set a reminder before any outdoor plans?` };
+      // Don't invent a climate: we know the family's own city, and a Brooklyn
+      // family was being told "Park Slope in Austin…".
+      return { reply: `I don't have live weather data${ctx.city ? ` for ${ctx.city}` : ""} — your phone will have the exact forecast. Want me to set a reminder before any outdoor plans?` };
 
     case "time_date": {
       const now = formatUserNow(tzOffsetMin);
@@ -512,21 +521,22 @@ function generateResponse(
         "Take a peek at the Calendar tab for what's coming up. Anything you'd like me to schedule?",
       ]) };
 
+    // Neither of these can edit the calendar yet, so they say what's actually
+    // true and point at the control that does work, rather than implying the
+    // change has been made.
     case "cancel":
-      return { reply: pick([
-        "No problem — I'll hold off on that. You can also remove anything directly from the Calendar tab.",
-        "Got it, I won't move forward with it. Anything you'd like to set up instead?",
-      ]) };
+      return { reply:
+        "I can't remove things from the calendar myself yet — open the Calendar tab, tap the event, and hit Remove. Anything you'd like me to set up instead?" };
 
     case "reschedule":
       return { reply: when
-        ? `Sure — I'll move that to ${when} and confirm. You can also drag it on the Calendar tab.`
-        : "Happy to reschedule — what day and time should I move it to?" };
+        ? `I can't move events myself yet. On the Calendar tab you can remove it and add it back for ${when} — or tell me the details and I'll create the new one.`
+        : "I can't move events myself yet — remove it on the Calendar tab, then tell me the new day and time and I'll add it." };
 
     default:
       return {
         reply: pick([
-          `Got it. I'll look into that for the ${shortName} family and follow up. Any deadline or details I should keep in mind?`,
+          `Got it. I'll look into that for ${familyPhrase === "your family" ? "you" : `the ${familyPhrase}`} and follow up. Any deadline or details I should keep in mind?`,
           `On it. Anything specific about timing or preferences that would help me handle this better?`,
           `Noted — I'll take care of that. Any details before I move forward?`,
         ]),

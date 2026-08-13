@@ -8,10 +8,17 @@ export const dynamic = "force-dynamic";
 // Whether the nightly job has everything it needs. Booleans only — never the
 // values themselves — and only ever behind a signed-in session.
 function cronReadiness() {
+  const from = process.env.RESEND_FROM;
   return {
     cronSecret: !!process.env.CRON_SECRET,
     serviceKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
     resendKey: !!process.env.RESEND_API_KEY,
+    // Without RESEND_FROM the default sender is Resend's shared test address,
+    // which only delivers to the account owner — so every other user's
+    // reminder silently goes nowhere. Surfacing the sender (not a secret)
+    // makes that visible instead of invisible.
+    resendFrom: from ?? null,
+    canEmailAnyone: !!from,
   };
 }
 
