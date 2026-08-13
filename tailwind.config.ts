@@ -29,6 +29,7 @@ const config: Config = {
       },
       fontFamily: {
         sans: ["Figtree", "sans-serif"],
+        display: ["'Instrument Serif'", "Georgia", "serif"],
       },
       borderRadius: {
         xl: "12px",

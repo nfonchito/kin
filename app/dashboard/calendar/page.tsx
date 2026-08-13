@@ -9,7 +9,7 @@ export default async function CalendarPage() {
     return (
       <div className="px-5 py-6">
         <div className="mb-6">
-          <h1 className="text-xl font-semibold text-text-primary">Calendar</h1>
+          <h1 className="font-display text-[2rem] leading-tight text-text-primary tracking-[-0.01em]">Calendar</h1>
           <p className="text-sm text-text-secondary mt-0.5">Upcoming events and bookings</p>
         </div>
         <CalendarView events={[]} familyId="preview" />

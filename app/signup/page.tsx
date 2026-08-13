@@ -97,7 +97,7 @@ export default function SignupPage() {
         </div>
 
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-semibold text-text-primary mb-1">Join Kin</h1>
+          <h1 className="font-display text-4xl text-text-primary mb-2 tracking-[-0.01em]">Join Kin</h1>
           <p className="text-text-secondary text-sm">Set up your family&apos;s dashboard</p>
         </div>
 

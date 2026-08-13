@@ -1,4 +1,7 @@
-@import url('https://fonts.googleapis.com/css2?family=Figtree:ital,wght@0,300..900;1,300..900&display=swap');
+/* Figtree carries the UI; Instrument Serif is the editorial display voice —
+   high-contrast and characterful, and deliberately not the predictable
+   Playfair pairing. */
+@import url('https://fonts.googleapis.com/css2?family=Figtree:ital,wght@0,300..900;1,300..900&family=Instrument+Serif:ital@0;1&display=swap');
 
 @tailwind base;
 @tailwind components;

@@ -83,7 +83,7 @@ export default async function DashboardPage() {
           />
           <div className="relative">
             <TodayLabel className="mb-1.5" />
-            <h1 className="text-xl font-semibold text-text-primary tracking-tight">
+            <h1 className="font-display text-[2rem] leading-tight text-text-primary tracking-[-0.01em]">
               Hey, {family?.name ?? "there"} 👋
             </h1>
             <p className="text-sm text-text-secondary mt-1">What can Kin help with today?</p>

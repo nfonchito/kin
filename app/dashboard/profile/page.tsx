@@ -9,7 +9,7 @@ export default async function ProfilePage() {
     return (
       <div className="px-5 py-6 max-w-2xl">
         <div className="mb-6">
-          <h1 className="text-xl font-semibold text-text-primary">Family Profile</h1>
+          <h1 className="font-display text-[2rem] leading-tight text-text-primary tracking-[-0.01em]">Family Profile</h1>
           <p className="text-sm text-text-secondary mt-0.5">Your family details and preferences</p>
         </div>
         <ProfileForm
@@ -48,7 +48,7 @@ export default async function ProfilePage() {
   return (
     <div className="px-5 py-6 max-w-2xl">
       <div className="mb-6">
-        <h1 className="text-xl font-semibold text-text-primary">Family Profile</h1>
+        <h1 className="font-display text-[2rem] leading-tight text-text-primary tracking-[-0.01em]">Family Profile</h1>
         <p className="text-sm text-text-secondary mt-0.5">Your family details and preferences</p>
       </div>
       <ProfileForm

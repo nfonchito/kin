@@ -70,7 +70,7 @@ export default function LoginPage() {
         </div>
 
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-semibold text-text-primary mb-1">Welcome back</h1>
+          <h1 className="font-display text-4xl text-text-primary mb-2 tracking-[-0.01em]">Welcome back</h1>
           <p className="text-text-secondary text-sm">Sign in to your family dashboard</p>
         </div>
 

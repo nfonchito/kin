@@ -11,7 +11,7 @@ export function PreviewGreeting() {
   }, []);
 
   return (
-    <h1 className="text-xl font-semibold text-text-primary tracking-tight">
+    <h1 className="font-display text-[2rem] leading-tight text-text-primary tracking-[-0.01em]">
       Hey{name ? `, ${name}` : " there"} 👋
     </h1>
   );

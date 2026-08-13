@@ -29,7 +29,7 @@ export function LegalPage({ title, lastUpdated, current, children }: LegalPagePr
         </div>
 
         {/* Title */}
-        <h1 className="text-2xl font-semibold text-text-primary mb-1">{title}</h1>
+        <h1 className="font-display text-4xl text-text-primary mb-2 tracking-[-0.01em]">{title}</h1>
         <p className="text-sm text-text-muted mb-8">Last updated {lastUpdated}</p>
 
         {/* Content */}
