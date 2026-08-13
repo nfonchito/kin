@@ -179,7 +179,6 @@ export default function SignupPage() {
           <span className="opacity-40">·</span>
           <Link href="/terms" className="hover:text-text-secondary transition-colors">Terms</Link>
         </div>
-        <p>Northwest Hills · Austin, TX 78731</p>
       </div>
     </div>
   );

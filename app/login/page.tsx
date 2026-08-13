@@ -99,7 +99,15 @@ export default function LoginPage() {
           </div>
 
           <div>
-            <label className="block text-sm text-text-secondary mb-1.5">Password</label>
+            <div className="flex items-baseline justify-between mb-1.5">
+              <label className="block text-sm text-text-secondary">Password</label>
+              <Link
+                href="/forgot-password"
+                className="text-xs text-accent hover:text-accent-dim transition-colors"
+              >
+                Forgot?
+              </Link>
+            </div>
             <input
               type="password"
               value={password}
@@ -139,7 +147,6 @@ export default function LoginPage() {
           <span className="opacity-40">·</span>
           <Link href="/terms" className="hover:text-text-secondary transition-colors">Terms</Link>
         </div>
-        <p>Northwest Hills · Austin, TX 78731</p>
       </div>
     </div>
   );

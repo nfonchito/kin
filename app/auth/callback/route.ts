@@ -8,7 +8,13 @@ export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
-  const next = searchParams.get("next") ?? "/dashboard";
+
+  // Only ever a same-site path. A single leading slash and no "//" keeps this
+  // from being turned into an open redirect via ?next=//evil.example.
+  const requestedNext = searchParams.get("next") ?? "";
+  const next = /^\/(?!\/)[A-Za-z0-9\-._~!$&'()*+,;=:@%/]*$/.test(requestedNext)
+    ? requestedNext
+    : "/dashboard";
 
   // How a refusal comes back (e.g. the user pressed Cancel on Google).
   const oauthError = searchParams.get("error_description") ?? searchParams.get("error");

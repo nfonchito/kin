@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 import { sendTaskNotification } from "@/lib/email";
 import { generateSmartReply } from "@/lib/ai";
+import { rateLimit } from "@/lib/ratelimit";
 import {
   TOMORROW_RE,
   TODAY_RE,
@@ -339,19 +340,30 @@ function generateResponse(
 
     case "what_is_kin": {
       const knows = ctx.name === "your family" ? "your family" : `the ${ctx.name}`;
-      return { reply: `I'm Kin — somewhere to put everything the house needs so you're not holding it in your head. Tell me in plain English and I'll get it on your calendar, keep a list, and email you each morning with what's ahead. I know ${knows} and your home in ${ctx.neighborhood}, so you don't have to re-explain things. I don't book services or make calls — that part's still yours.` };
+      return { reply: `I'm Kin — somewhere to put everything the house needs so you're not holding it in your head. Tell me in plain English and I'll get it on your calendar, keep a list, and email you each morning with what's ahead.${ctx.neighborhood ? ` I know ${knows} and your home in ${ctx.neighborhood}, so you don't have to re-explain things.` : ""} I don't book services or make calls — that part's still yours.` };
     }
 
-    case "where_live":
-      return { reply: `You're in ${ctx.neighborhood}, ${ctx.city}, ${ctx.state} ${ctx.zip}. I'll use that whenever a request depends on where you are.` };
+    case "where_live": {
+      const place = [ctx.neighborhood, ctx.city, [ctx.state, ctx.zip].filter(Boolean).join(" ")]
+        .filter(Boolean)
+        .join(", ");
+      return { reply: place
+        ? `You're in ${place}. I'll use that whenever a request depends on where you are.`
+        : `You haven't told me where you are yet — add it on the Profile page and I'll use it whenever a request depends on your location.` };
+    }
 
     case "family_members":
       if (ctx.members.length === 0)
         return { reply: "I don't have your family members on file yet. Head to your Profile page and add them — it helps me give more personalized responses." };
       return { reply: `Your household: ${ctx.members.map(m => `${m.name} (${m.role}${m.age ? `, ${m.age}` : ""})`).join(", ")}. Anything I can do for any of them?` };
 
-    case "family_name":
-      return { reply: `You're the ${ctx.name}, based in ${ctx.neighborhood}. What can I help with?` };
+    case "family_name": {
+      // "You're the My Family." — same placeholder problem as the default reply.
+      const based = ctx.neighborhood ? `, based in ${ctx.neighborhood}` : "";
+      return { reply: looksLikeAFamilyName
+        ? `Your account is still called "${ctx.name}" — you can rename it on the Profile page. What can I help with?`
+        : `You're the ${ctx.name}${based}. What can I help with?` };
+    }
 
     case "weather":
       // Don't invent a climate: we know the family's own city, and a Brooklyn
@@ -633,6 +645,17 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  // Authenticated, but one account can still loop this endpoint — and every
+  // call may send email and, once a model key is set, cost money. Keyed on the
+  // user so one noisy account can't affect anyone else.
+  const limit = rateLimit(`chat:${user.id}`);
+  if (!limit.ok) {
+    return NextResponse.json(
+      { error: "You're sending messages faster than Kin can keep up. Try again in a moment." },
+      { status: 429, headers: { "Retry-After": String(limit.retryAfterSeconds) } }
+    );
+  }
+
   // Load family context. RLS already scopes these reads to the caller, but
   // check ownership explicitly below rather than proceeding with a null family
   // and letting the writes fail silently.
@@ -651,12 +674,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Family not found" }, { status: 404 });
   }
 
+  // Never substitute a location the family didn't give us — an invented
+  // "Northwest Hills, Austin" is worse than saying we don't know.
   const ctx: FamilyContext = {
     name: family.name ?? "your family",
-    neighborhood: family.neighborhood ?? "Northwest Hills",
-    city: family.city ?? "Austin",
-    state: family.state ?? "TX",
-    zip: family.zip ?? "78731",
+    neighborhood: family.neighborhood ?? "",
+    city: family.city ?? "",
+    state: family.state ?? "",
+    zip: family.zip ?? "",
     members: members ?? [],
     preferences: preferences ?? null,
   };

@@ -18,16 +18,35 @@ interface Message {
 interface ChatInterfaceProps {
   familyId: string | undefined;
   initialMessages: Message[];
+  /** Household member names, used to make the starter prompts theirs. */
+  memberNames?: string[];
 }
 
-const SUGGESTIONS = [
-  "Book lawn care for Saturday",
-  "Remind David about Emma's soccer Thursday",
-  "Schedule house cleaning next week",
-  "Add grocery run to the list",
+// Nothing here names a person who might not exist. The old set invited a brand
+// new account to click "Remind David about Emma's soccer Thursday" — a script
+// about someone else's family.
+const GENERIC_SUGGESTIONS = [
+  "Lawn care every Thursday",
+  "Dentist appointment next Tuesday at 2pm",
+  "Remind me to renew the car registration Friday",
+  "Bin day every Monday morning",
 ];
 
-export function ChatInterface({ familyId, initialMessages }: ChatInterfaceProps) {
+function buildSuggestions(memberNames: string[]): string[] {
+  const [first, second] = memberNames.filter(Boolean);
+  if (!first) return GENERIC_SUGGESTIONS;
+
+  // Once we know who's in the household, use their actual names.
+  return [
+    `Dentist for ${first} next Tuesday at 2pm`,
+    second ? `Remind ${second} about the school run Thursday` : "Lawn care every Thursday",
+    "Remind me to renew the car registration Friday",
+    "Bin day every Monday morning",
+  ];
+}
+
+export function ChatInterface({ familyId, initialMessages, memberNames = [] }: ChatInterfaceProps) {
+  const suggestions = buildSuggestions(memberNames);
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -278,7 +297,7 @@ export function ChatInterface({ familyId, initialMessages }: ChatInterfaceProps)
 
         {messages.length === 0 && (
           <div className="flex flex-wrap gap-2 mb-3">
-            {SUGGESTIONS.map((s) => (
+            {suggestions.map((s) => (
               <button
                 key={s}
                 onClick={() => sendMessage(s)}

@@ -71,6 +71,13 @@ export default async function DashboardPage() {
     .order("start_time", { ascending: true })
     .limit(5);
 
+  // Starter prompts use the household's own names rather than a demo family.
+  const { data: familyMembers } = await supabase
+    .from("family_members")
+    .select("name")
+    .eq("family_id", family?.id)
+    .order("created_at", { ascending: true });
+
   return (
     <div className="flex flex-col lg:flex-row h-full min-h-[calc(100vh-56px)] lg:min-h-screen">
       <div className="flex-1 flex flex-col min-h-[60vh] lg:min-h-0">
@@ -90,7 +97,11 @@ export default async function DashboardPage() {
           </div>
         </div>
         <div className="flex-1 overflow-hidden">
-          <ChatInterface familyId={family?.id} initialMessages={messages ?? []} />
+          <ChatInterface
+            familyId={family?.id}
+            initialMessages={messages ?? []}
+            memberNames={(familyMembers ?? []).map((m) => m.name)}
+          />
         </div>
       </div>
       <div className="w-full lg:w-80 xl:w-96 border-t lg:border-t-0 lg:border-l border-border flex flex-col overflow-auto">
