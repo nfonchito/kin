@@ -38,6 +38,12 @@ interface FamilyContext {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+// True only when this deployment has no real Supabase behind it. Gates the
+// unauthenticated "preview" chat path, which must never be reachable in prod.
+const IS_PREVIEW_DEPLOYMENT =
+  !process.env.NEXT_PUBLIC_SUPABASE_URL ||
+  process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder");
+
 function pick<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
 }
@@ -564,8 +570,15 @@ export async function POST(req: NextRequest) {
         })()
       : null;
 
-  // Preview mode — no Supabase. Use the profile the client passes from localStorage.
+  // Preview mode — no Supabase. Use the profile the client passes from
+  // localStorage. This branch runs BEFORE any auth check, so it is only ever
+  // reachable on a deployment that has no Supabase configured. Otherwise
+  // anyone could POST familyId:"preview" and use the endpoint unauthenticated
+  // (which also means triggering email, and billing once a model key is set).
   if (familyId === "preview") {
+    if (!IS_PREVIEW_DEPLOYMENT) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     const provided = context && typeof context === "object" ? context : {};
     const ctx: FamilyContext = {
       name: provided.name || "your family",
@@ -609,22 +622,30 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  // Load family context
+  // Load family context. RLS already scopes these reads to the caller, but
+  // check ownership explicitly below rather than proceeding with a null family
+  // and letting the writes fail silently.
   const [{ data: family }, { data: members }, { data: preferences }, { data: recentMessages }] =
     await Promise.all([
-      supabase.from("families").select("*").eq("id", familyId).single(),
+      supabase.from("families").select("*").eq("id", familyId).eq("user_id", user.id).single(),
       supabase.from("family_members").select("name, role, age").eq("family_id", familyId),
       supabase.from("family_preferences").select("*").eq("family_id", familyId).single(),
       supabase.from("messages").select("role, content").eq("family_id", familyId)
         .order("created_at", { ascending: false }).limit(10),
     ]);
 
+  // Someone else's familyId (or one that doesn't exist) stops here rather than
+  // getting a generated reply off default context.
+  if (!family) {
+    return NextResponse.json({ error: "Family not found" }, { status: 404 });
+  }
+
   const ctx: FamilyContext = {
-    name: family?.name ?? "your family",
-    neighborhood: family?.neighborhood ?? "Northwest Hills",
-    city: family?.city ?? "Austin",
-    state: family?.state ?? "TX",
-    zip: family?.zip ?? "78731",
+    name: family.name ?? "your family",
+    neighborhood: family.neighborhood ?? "Northwest Hills",
+    city: family.city ?? "Austin",
+    state: family.state ?? "TX",
+    zip: family.zip ?? "78731",
     members: members ?? [],
     preferences: preferences ?? null,
   };
