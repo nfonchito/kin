@@ -184,6 +184,115 @@ export function whenPhrase(w: string | null): string {
   return ` on ${w}`;
 }
 
+// ── Repeating events ─────────────────────────────────────────────────────────
+// There's no recurrence column on `events`, so a repeat is stored as a run of
+// real rows. That keeps the calendar and the reminder job working unchanged;
+// the trade-off is a finite horizon, so each cadence generates a sensible
+// stretch ahead rather than forever.
+
+interface RecurrenceSpec {
+  unit: "day" | "week" | "month";
+  interval: number;
+  count: number;
+  weekdaysOnly?: boolean;
+}
+
+export function recurrenceSpec(phrase: string | null): RecurrenceSpec | null {
+  if (!phrase) return null;
+  const p = phrase.toLowerCase();
+  if (/^every (sunday|monday|tuesday|wednesday|thursday|friday|saturday)$/.test(p))
+    return { unit: "week", interval: 1, count: 12 };      // ~3 months
+  if (p === "every other week") return { unit: "week", interval: 2, count: 8 };
+  if (p === "every week") return { unit: "week", interval: 1, count: 12 };
+  if (p === "every weekday") return { unit: "day", interval: 1, count: 10, weekdaysOnly: true };
+  if (p === "every day" || p === "every morning" || p === "every evening")
+    return { unit: "day", interval: 1, count: 14 };       // 2 weeks
+  if (p === "every month") return { unit: "month", interval: 1, count: 6 };
+  if (p === "every year") return { unit: "month", interval: 12, count: 3 };
+  return null;
+}
+
+// Minutes to ADD to local time to reach UTC, for a named zone at an instant.
+// Unlike a fixed offset this tracks daylight saving.
+function zoneOffsetAt(ts: number, timeZone: string): number {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone, hour12: false,
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit",
+  }).formatToParts(new Date(ts));
+  const get = (type: string) => Number(parts.find((p) => p.type === type)?.value ?? 0);
+  const asUTC = Date.UTC(get("year"), get("month") - 1, get("day"), get("hour"), get("minute"), get("second"));
+  return (ts - asUTC) / MS_MIN;
+}
+
+// The instant when a given local wall-clock time occurs in a named zone.
+function zonedToInstant(
+  y: number, mo: number, d: number, h: number, mi: number, timeZone: string
+): number {
+  const guess = Date.UTC(y, mo, d, h, mi);
+  const off1 = zoneOffsetAt(guess, timeZone);
+  const ts = guess + off1 * MS_MIN;
+  // Re-check: near a DST boundary the first guess can land on the wrong side.
+  const off2 = zoneOffsetAt(ts, timeZone);
+  return off2 === off1 ? ts : guess + off2 * MS_MIN;
+}
+
+function zonedParts(ts: number, timeZone: string) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone, hour12: false,
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit",
+  }).formatToParts(new Date(ts));
+  const get = (type: string) => Number(parts.find((p) => p.type === type)?.value ?? 0);
+  return { year: get("year"), month: get("month") - 1, day: get("day"), hour: get("hour"), minute: get("minute") };
+}
+
+// All occurrence timestamps for a cadence, starting at (and including) the
+// first. Stepping happens on the civil calendar and each occurrence is then
+// pinned to the same local wall time, so a 9am weekly event stays at 9am
+// across a daylight-saving change (a fixed offset would drift by an hour).
+// Falls back to fixed-offset stepping when no zone name is available.
+export function expandOccurrences(
+  startISO: string,
+  phrase: string | null,
+  tzOffsetMin = 0,
+  timeZone?: string | null
+): string[] {
+  const spec = recurrenceSpec(phrase);
+  if (!spec) return [startISO];
+
+  const out: string[] = [];
+  const startTs = new Date(startISO).getTime();
+
+  // Wall-clock reference: from the real zone when we have one, else the offset.
+  const ref = timeZone
+    ? zonedParts(startTs, timeZone)
+    : (() => {
+        const d = new Date(startTs - tzOffsetMin * MS_MIN);
+        return { year: d.getUTCFullYear(), month: d.getUTCMonth(), day: d.getUTCDate(), hour: d.getUTCHours(), minute: d.getUTCMinutes() };
+      })();
+
+  // Pure date cursor — no time, so DST can't perturb the stepping.
+  const cursor = new Date(Date.UTC(ref.year, ref.month, ref.day));
+
+  let guard = 0;
+  while (out.length < spec.count && guard < 500) {
+    guard++;
+    const dow = cursor.getUTCDay();
+    if (!spec.weekdaysOnly || (dow !== 0 && dow !== 6)) {
+      const y = cursor.getUTCFullYear(), mo = cursor.getUTCMonth(), d = cursor.getUTCDate();
+      const ts = timeZone
+        ? zonedToInstant(y, mo, d, ref.hour, ref.minute, timeZone)
+        : Date.UTC(y, mo, d, ref.hour, ref.minute) + tzOffsetMin * MS_MIN;
+      out.push(new Date(ts).toISOString());
+    }
+    if (spec.unit === "day") cursor.setUTCDate(cursor.getUTCDate() + spec.interval);
+    else if (spec.unit === "week") cursor.setUTCDate(cursor.getUTCDate() + 7 * spec.interval);
+    else cursor.setUTCMonth(cursor.getUTCMonth() + spec.interval);
+  }
+  return out;
+}
+
 // The user's current date and time as display strings, in their timezone.
 export function formatUserNow(tzOffsetMin = 0): { date: string; time: string } {
   const wall = shiftedNow(tzOffsetMin);

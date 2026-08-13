@@ -12,6 +12,7 @@ import {
   friendlyWhen,
   whenPhrase,
   formatUserNow,
+  expandOccurrences,
 } from "@/lib/dates";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -64,6 +65,7 @@ interface CalEvent {
   start_time: string;
   category: string;
   color: string;
+  description?: string;
 }
 
 function extractEventTitle(msg: string): string {
@@ -101,6 +103,47 @@ function buildCalendarEvent(
     category,
     color: CAL_COLOR[category] ?? "#6b7280",
   };
+}
+
+// A repeat ("every Thursday") becomes a run of real event rows, since there's
+// no recurrence column. One-off requests come back as a single-item array.
+function buildEventSeries(
+  activity: { title: string; category: string },
+  msg: string,
+  tzOffsetMin: number,
+  timeZone?: string | null
+): CalEvent[] {
+  const recurrence = extractRecurrence(msg);
+
+  let first = buildCalendarEvent(activity, msg, tzOffsetMin);
+
+  // "every day" / "every month" name a cadence but no start date. Anchor the
+  // series to tomorrow, carrying over any time the message did mention.
+  if (!first && recurrence) {
+    first = buildCalendarEvent(activity, `tomorrow ${msg}`, tzOffsetMin);
+  }
+
+  if (!first) return [];
+  if (!recurrence) return [first];
+
+  // "Lawn care — every Thursday" repeated 12 times reads badly on a calendar;
+  // the cadence belongs in the description, not every row's title. Titles
+  // carry it either as an em-dash suffix or in parentheses.
+  const escaped = recurrence.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const title =
+    first.title
+      .replace(new RegExp(`\\s*[—-]\\s*${escaped}\\s*$`, "i"), "")
+      .replace(new RegExp(`\\s*\\(${escaped}\\)\\s*$`, "i"), "")
+      .trim() || first.title;
+
+  const stamp = Date.now();
+  return expandOccurrences(first.start_time, recurrence, tzOffsetMin, timeZone).map((start_time, i) => ({
+    ...first,
+    id: `${stamp}-${i}`,
+    title,
+    start_time,
+    description: `Repeats ${recurrence}`,
+  }));
 }
 
 // ─── Entity extraction ──────────────────────────────────────────────────────────
@@ -247,7 +290,9 @@ function detectIntent(msg: string, history: Message[], tzOffsetMin = 0): string 
   // Generic calendar event — any message that references a date/day.
   // Questions, greetings, and thanks are matched and returned above, so
   // by here a date reference almost always means "put this on my calendar".
-  if (hasDateLike(msg, tzOffsetMin))
+  // A bare cadence ("water the plants every day") names no date but is still
+  // a calendar request — the series anchors to tomorrow.
+  if (hasDateLike(msg, tzOffsetMin) || extractRecurrence(msg))
     return "add_to_calendar";
 
   return "general";
@@ -484,10 +529,17 @@ function generateResponse(
   }
 }
 
+// Only claim what actually got saved — and say how many when it repeats.
+function calendarNote(savedCount: number): string {
+  if (savedCount === 0) return "";
+  if (savedCount === 1) return " I've added it to your calendar.";
+  return ` I've put the next ${savedCount} on your calendar.`;
+}
+
 // ─── Route handler ────────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
-  const { message, familyId, context, tzOffset } = await req.json();
+  const { message, familyId, context, tzOffset, timeZone } = await req.json();
   if (!message || !familyId)
     return NextResponse.json({ error: "Missing message or familyId" }, { status: 400 });
 
@@ -496,6 +548,21 @@ export async function POST(req: NextRequest) {
   const tz = typeof tzOffset === "number" && Number.isFinite(tzOffset) && Math.abs(tzOffset) <= 900
     ? Math.round(tzOffset)
     : 0;
+
+  // IANA zone name (e.g. "America/Chicago"). Needed on top of the offset so
+  // repeating events hold their local time across daylight saving. Validated
+  // before use — it reaches Intl, which throws on junk.
+  const zone: string | null =
+    typeof timeZone === "string" && /^[A-Za-z][A-Za-z0-9_+\-]*(\/[A-Za-z0-9_+\-]+)*$/.test(timeZone) && timeZone.length < 64
+      ? (() => {
+          try {
+            new Intl.DateTimeFormat("en-US", { timeZone }).format();
+            return timeZone;
+          } catch {
+            return null;
+          }
+        })()
+      : null;
 
   // Preview mode — no Supabase. Use the profile the client passes from localStorage.
   if (familyId === "preview") {
@@ -509,14 +576,15 @@ export async function POST(req: NextRequest) {
     };
     const intent = detectIntent(message, [], tz);
     const { reply, activity } = generateResponse(intent, message, ctx, tz);
-    const calEvent = activity ? buildCalendarEvent(activity, message, tz) : null;
+    const series = activity ? buildEventSeries(activity, message, tz, zone) : [];
+    const calEvent = series[0] ?? null;
 
     // Use Claude for the reply when an API key is configured; otherwise fall back.
     const smart = await generateSmartReply(message, ctx, [], {
       calendarEvent: calEvent ? { title: calEvent.title, start_time: calEvent.start_time } : null,
       activity: activity ?? null,
     });
-    const finalReply = smart ?? (calEvent ? `${reply} I've added it to your calendar.` : reply);
+    const finalReply = smart ?? (reply + calendarNote(series.length));
 
     // Awaited: fire-and-forget promises can be cut off when the serverless
     // function freezes after the response is sent.
@@ -533,7 +601,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       reply: finalReply,
       message: { id: Date.now().toString(), role: "assistant", content: finalReply, created_at: new Date().toISOString() },
-      ...(calEvent ? { event: calEvent } : {}),
+      ...(series.length ? { event: calEvent, events: series } : {}),
     });
   }
 
@@ -573,29 +641,34 @@ export async function POST(req: NextRequest) {
   // Generate response
   const intent = detectIntent(message, history, tz);
   const { reply, activity } = generateResponse(intent, message, ctx, tz);
-  const calEvent = activity ? buildCalendarEvent(activity, message, tz) : null;
+  const series = activity ? buildEventSeries(activity, message, tz, zone) : [];
 
-  // Create the calendar event BEFORE composing the reply, so "I've added it
-  // to your calendar" is only ever said when the row actually saved.
-  let savedEvent: CalEvent | null = null;
-  if (calEvent) {
-    const { error: eventError } = await supabase.from("events").insert({
-      family_id: familyId,
-      title: calEvent.title,
-      start_time: calEvent.start_time,
-      category: calEvent.category,
-      color: calEvent.color,
-    });
+  // Save the calendar rows BEFORE composing the reply, so the confirmation
+  // only ever claims what actually persisted.
+  let savedEvents: CalEvent[] = [];
+  if (series.length > 0) {
+    const { error: eventError } = await supabase.from("events").insert(
+      series.map((e) => ({
+        family_id: familyId,
+        title: e.title,
+        start_time: e.start_time,
+        category: e.category,
+        color: e.color,
+        ...(e.description ? { description: e.description } : {}),
+      }))
+    );
     if (eventError) console.error("[chat] calendar event insert failed:", eventError.message, eventError);
-    else savedEvent = calEvent;
+    else savedEvents = series;
   }
+
+  const savedEvent = savedEvents[0] ?? null;
 
   // Use Claude for the reply when an API key is configured; otherwise fall back.
   const smart = await generateSmartReply(message, ctx, history, {
     calendarEvent: savedEvent ? { title: savedEvent.title, start_time: savedEvent.start_time } : null,
     activity: activity ?? null,
   });
-  const finalReply = smart ?? (savedEvent ? `${reply} I've added it to your calendar.` : reply);
+  const finalReply = smart ?? (reply + calendarNote(savedEvents.length));
 
   // Save assistant message
   const { data: assistantMsg } = await supabase
@@ -629,5 +702,9 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  return NextResponse.json({ reply: finalReply, message: assistantMsg, ...(savedEvent ? { event: savedEvent } : {}) });
+  return NextResponse.json({
+    reply: finalReply,
+    message: assistantMsg,
+    ...(savedEvents.length ? { event: savedEvent, events: savedEvents } : {}),
+  });
 }

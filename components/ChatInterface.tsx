@@ -100,18 +100,27 @@ export function ChatInterface({ familyId, initialMessages }: ChatInterfaceProps)
           message: text.trim(),
           familyId,
           context,
-          // Lets the server compute "today"/"tomorrow" in the user's timezone
+          // Lets the server compute "today"/"tomorrow" in the user's timezone.
+          // The zone name matters too: repeating events step across daylight
+          // saving, which a fixed offset can't represent.
           tzOffset: new Date().getTimezoneOffset(),
+          timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         }),
       });
 
       const data = await res.json();
 
-      // Persist calendar event to localStorage in preview mode
-      if (data.event && familyId === "preview") {
+      // Persist calendar events to localStorage in preview mode. A repeating
+      // request ("every Thursday") comes back as a series, not a single event.
+      const newEvents = Array.isArray(data.events)
+        ? data.events
+        : data.event
+          ? [data.event]
+          : [];
+      if (newEvents.length > 0 && familyId === "preview") {
         try {
           const stored: unknown[] = JSON.parse(localStorage.getItem("kin_calendar_events") || "[]");
-          stored.push(data.event);
+          stored.push(...newEvents);
           localStorage.setItem("kin_calendar_events", JSON.stringify(stored));
         } catch {}
       }
