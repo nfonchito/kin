@@ -35,7 +35,7 @@ interface ProfileFormProps {
 }
 
 const MEMBER_COLORS = [
-  "#15c489", "#6366f1", "#f59e0b", "#ec4899", "#8b5cf6", "#14b8a6"
+  "#c2610c", "#4338ca", "#b45309", "#be185d", "#6d28d9", "#0f766e"
 ];
 
 export function ProfileForm({ family, members: initialMembers, preferences: initialPrefs, userEmail, isPreview }: ProfileFormProps) {
@@ -246,7 +246,7 @@ export function ProfileForm({ family, members: initialMembers, preferences: init
               </div>
               <button
                 onClick={() => removeMember(member.id)}
-                className="opacity-0 group-hover:opacity-100 p-1 text-text-muted hover:text-red-400 transition-all"
+                className="opacity-0 group-hover:opacity-100 p-1 text-text-muted hover:text-red-700 transition-all"
               >
                 <Trash2 size={14} />
               </button>
@@ -286,7 +286,7 @@ export function ProfileForm({ family, members: initialMembers, preferences: init
                 <button
                   onClick={addMember}
                   disabled={!newMemberName}
-                  className="flex-1 bg-teal hover:bg-teal-dim text-bg text-sm font-medium rounded-lg py-2 transition-colors disabled:opacity-50"
+                  className="flex-1 bg-accent hover:bg-accent-dim text-bg text-sm font-medium rounded-lg py-2 transition-colors disabled:opacity-50"
                 >
                   Add
                 </button>
@@ -364,7 +364,7 @@ export function ProfileForm({ family, members: initialMembers, preferences: init
             <button
               onClick={() => setReminders(!reminders)}
               className={`w-10 h-6 rounded-full transition-colors relative ${
-                reminders ? "bg-teal" : "bg-surface-3"
+                reminders ? "bg-accent" : "bg-surface-3"
               }`}
             >
               <span
@@ -389,8 +389,8 @@ export function ProfileForm({ family, members: initialMembers, preferences: init
                 <p
                   className={`mt-2 text-xs rounded-lg px-3 py-2 border ${
                     reminderResult.ok
-                      ? "text-teal bg-teal/10 border-teal/20"
-                      : "text-amber-400 bg-amber-400/10 border-amber-400/20"
+                      ? "text-accent bg-accent/10 border-accent/20"
+                      : "text-amber-800 bg-amber-800/8 border-amber-800/25"
                   }`}
                 >
                   {reminderResult.message}
@@ -445,8 +445,8 @@ function SaveButton({
       disabled={loading || saved}
       className={`text-sm font-medium px-4 py-2 rounded-lg transition-colors ${
         saved
-          ? "bg-teal/20 text-teal"
-          : "bg-teal hover:bg-teal-dim text-bg disabled:opacity-50"
+          ? "bg-accent/20 text-accent"
+          : "bg-accent hover:bg-accent-dim text-bg disabled:opacity-50"
       }`}
     >
       {saved ? "Saved" : loading ? "Saving…" : "Save changes"}

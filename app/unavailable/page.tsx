@@ -28,7 +28,7 @@ export default function UnavailablePage() {
 
           <Link
             href="/dashboard"
-            className="mt-6 inline-flex items-center gap-2 bg-teal hover:bg-teal-dim text-bg font-semibold rounded-xl px-5 py-2.5 text-sm transition-colors"
+            className="mt-6 inline-flex items-center gap-2 bg-accent hover:bg-accent-dim text-bg font-semibold rounded-xl px-5 py-2.5 text-sm transition-colors"
           >
             <RefreshCw size={14} />
             Try again
@@ -37,7 +37,7 @@ export default function UnavailablePage() {
 
         <p className="mt-6 text-xs text-text-muted">
           Still stuck? Email{" "}
-          <a href="mailto:hello@kinfamily.app" className="text-teal hover:text-teal-dim transition-colors">
+          <a href="mailto:hello@kinfamily.app" className="text-accent hover:text-accent-dim transition-colors">
             hello@kinfamily.app
           </a>
         </p>

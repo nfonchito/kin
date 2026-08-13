@@ -17,8 +17,8 @@ html {
 }
 
 body {
-  background-color: #090907;
-  color: #f0efe8;
+  background-color: #fdf6e8;
+  color: #4a3a24;
   font-family: 'Figtree', sans-serif;
 }
 
@@ -32,17 +32,17 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #2a2a27;
+  background: #ebdec3;
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #3a3a37;
+  background: #dcc9a4;
 }
 
 /* Focus styles */
 :focus-visible {
-  outline: 2px solid rgba(21, 196, 137, 0.5);
+  outline: 2px solid rgba(194, 97, 12, 0.55);
   outline-offset: 2px;
 }
 
@@ -74,24 +74,24 @@ a,
 
 /* Selection */
 ::selection {
-  background: rgba(21, 196, 137, 0.2);
-  color: #f0efe8;
+  background: rgba(240, 169, 60, 0.28);
+  color: #4a3a24;
 }
 
 @layer components {
   .input-field {
-    @apply w-full bg-surface-2 border border-border rounded-xl px-3 py-2.5 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-teal/40 transition-colors;
+    @apply w-full bg-surface border border-border rounded-xl px-3 py-2.5 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent/50 transition-colors;
   }
 }
 
 /* Legal pages (privacy / terms) */
 .legal-prose {
-  color: #c9c8c0;
+  color: #6d5c40;
   font-size: 15px;
   line-height: 1.7;
 }
 .legal-prose h2 {
-  color: #f0efe8;
+  color: #4a3a24;
   font-size: 18px;
   font-weight: 600;
   margin: 32px 0 10px;
@@ -111,11 +111,11 @@ a,
   margin: 0 0 6px;
 }
 .legal-prose strong {
-  color: #f0efe8;
+  color: #4a3a24;
   font-weight: 600;
 }
 .legal-prose a {
-  color: #15c489;
+  color: #c2610c;
   text-decoration: underline;
   text-underline-offset: 2px;
 }
@@ -125,15 +125,15 @@ a,
     text-wrap: balance;
   }
 
-  .bg-teal-muted {
-    background-color: rgba(21, 196, 137, 0.12);
+  .bg-accent-muted {
+    background-color: rgba(194, 97, 12, 0.10);
   }
 
-  .bg-teal-subtle {
-    background-color: rgba(21, 196, 137, 0.06);
+  .bg-accent-subtle {
+    background-color: rgba(194, 97, 12, 0.05);
   }
 
-  .border-teal-subtle {
-    border-color: rgba(21, 196, 137, 0.2);
+  .border-accent-subtle {
+    border-color: rgba(194, 97, 12, 0.22);
   }
 }

@@ -17,11 +17,11 @@ export function KinLogo({ size = 32, showWordmark = false, className = "" }: Kin
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
       >
-        <rect width="40" height="40" rx="10" fill="#15c489" />
+        <rect width="40" height="40" rx="10" fill="#c2610c" />
         {/* K letterform */}
         <path
           d="M12 10v20M12 20l10-10M12 20l10 10"
-          stroke="#090907"
+          stroke="#fdf6e8"
           strokeWidth="3"
           strokeLinecap="round"
           strokeLinejoin="round"

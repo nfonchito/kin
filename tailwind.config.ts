@@ -8,23 +8,28 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      // Sunset: soft pastel-yellow paper, warm brown ink, a sunset-orange accent.
+      // Backgrounds stay low-contrast and close together; the accent carries
+      // the emphasis. Two accent tones because one has to stay legible as
+      // small text while the other is only ever decorative.
       colors: {
-        bg: "#090907",
-        surface: "#111110",
-        "surface-2": "#1a1a18",
-        "surface-3": "#232320",
-        border: "#2a2a27",
-        "border-2": "#333330",
-        teal: {
-          DEFAULT: "#15c489",
-          dim: "#0fa070",
-          muted: "rgba(21,196,137,0.12)",
-          subtle: "rgba(21,196,137,0.06)",
+        bg: "#fdf6e8",          // pastel warm yellow
+        surface: "#fffbf2",     // cards, a touch lighter than the page
+        "surface-2": "#f8efdc",
+        "surface-3": "#f1e5cc",
+        border: "#ebdec3",      // soft — deliberately low contrast
+        "border-2": "#dcc9a4",
+        accent: {
+          DEFAULT: "#c2610c",   // deep sunset — readable as text and as a fill
+          dim: "#a04f08",       // hover
+          sun: "#f0a93c",       // light sunset, decorative only (glows, washes)
+          muted: "rgba(194,97,12,0.10)",
+          subtle: "rgba(194,97,12,0.05)",
         },
         text: {
-          primary: "#f0efe8",
-          secondary: "#9e9d94",
-          muted: "#5a5a54",
+          primary: "#4a3a24",   // warm brown ink
+          secondary: "#7c6b4e",
+          muted: "#8f7d5e",
         },
       },
       fontFamily: {
@@ -37,9 +42,9 @@ const config: Config = {
         "3xl": "20px",
       },
       boxShadow: {
-        card: "0 1px 3px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.04)",
-        glow: "0 0 24px rgba(21,196,137,0.15)",
-        "glow-sm": "0 0 12px rgba(21,196,137,0.1)",
+        card: "0 1px 2px rgba(74,58,36,0.05), 0 1px 3px rgba(74,58,36,0.04)",
+        glow: "0 0 24px rgba(240,169,60,0.22)",
+        "glow-sm": "0 0 12px rgba(240,169,60,0.16)",
       },
       animation: {
         "fade-in": "fadeIn 0.2s ease-out",

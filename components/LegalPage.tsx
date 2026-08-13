@@ -39,7 +39,7 @@ export function LegalPage({ title, lastUpdated, current, children }: LegalPagePr
         <div className="mt-12 pt-6 border-t border-border flex items-center justify-between text-sm">
           <Link
             href={current === "privacy" ? "/terms" : "/privacy"}
-            className="text-teal hover:text-teal-dim transition-colors"
+            className="text-accent hover:text-accent-dim transition-colors"
           >
             {current === "privacy" ? "Terms of Service" : "Privacy Policy"}
           </Link>

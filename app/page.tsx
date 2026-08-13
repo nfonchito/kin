@@ -54,7 +54,7 @@ export default function HomePage() {
             </Link>
             <Link
               href="/signup"
-              className="press text-sm font-medium bg-text-primary hover:bg-white text-bg rounded-lg px-4 py-2 transition-colors"
+              className="press text-sm font-medium bg-text-primary hover:opacity-90 text-bg rounded-lg px-4 py-2 transition-colors"
             >
               Get started
             </Link>
@@ -67,14 +67,14 @@ export default function HomePage() {
         <div
           aria-hidden
           className="pointer-events-none absolute -left-40 -top-40 w-[680px] h-[680px] rounded-full opacity-[0.16] blur-3xl"
-          style={{ background: "radial-gradient(circle, #15c489 0%, transparent 62%)" }}
+          style={{ background: "radial-gradient(circle, #f0a93c 0%, transparent 62%)" }}
         />
         <div className="relative mx-auto max-w-6xl px-6 lg:px-10 pt-20 pb-24 lg:pt-28 lg:pb-32">
           <div className="grid lg:grid-cols-12 gap-14 lg:gap-10 items-center">
             {/* Claim */}
             <div className="lg:col-span-7">
               <p className="flex items-center gap-3 text-[11px] font-medium uppercase tracking-[0.18em] text-text-muted mb-7">
-                <span className="h-px w-8 bg-teal" />
+                <span className="h-px w-8 bg-accent" />
                 Your family&apos;s personal assistant
               </p>
               <h1 className="font-display text-[3.25rem] sm:text-7xl lg:text-[5.25rem] leading-[0.95] tracking-[-0.02em] text-text-primary">
@@ -82,7 +82,7 @@ export default function HomePage() {
                 <br />
                 of running a home,
                 <br />
-                <em className="italic text-teal">handled.</em>
+                <em className="italic text-accent">handled.</em>
               </h1>
               <p className="mt-8 text-lg text-text-secondary max-w-md leading-relaxed">
                 Kin keeps track of your household — tasks, reminders, and the family calendar — so
@@ -91,7 +91,7 @@ export default function HomePage() {
               <div className="mt-10 flex flex-col sm:flex-row sm:items-center gap-3">
                 <Link
                   href="/signup"
-                  className="press group inline-flex items-center justify-center gap-2.5 bg-teal hover:bg-teal-dim text-bg font-semibold rounded-lg px-7 py-4 text-[15px] transition-colors"
+                  className="press group inline-flex items-center justify-center gap-2.5 bg-accent hover:bg-accent-dim text-bg font-semibold rounded-lg px-7 py-4 text-[15px] transition-colors"
                 >
                   Get started free
                   <ArrowRight size={17} className="group-hover:translate-x-1 transition-transform duration-200" />
@@ -116,7 +116,7 @@ export default function HomePage() {
                 </p>
                 <div className="space-y-3.5">
                   <div className="flex justify-end">
-                    <p className="bg-teal text-bg text-sm font-medium rounded-2xl rounded-br-md px-4 py-2.5 max-w-[85%]">
+                    <p className="bg-accent text-bg text-sm font-medium rounded-2xl rounded-br-md px-4 py-2.5 max-w-[85%]">
                       lawn care every thursday
                     </p>
                   </div>
@@ -128,7 +128,7 @@ export default function HomePage() {
                   </div>
                 </div>
                 <div className="mt-6 pt-5 border-t border-border flex items-center gap-2.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-teal" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-accent" />
                   <p className="text-xs text-text-secondary">
                     Reminder emailed each morning
                   </p>
@@ -156,10 +156,10 @@ export default function HomePage() {
               key={title}
               className="group relative bg-surface hover:bg-surface-2 p-8 lg:p-10 transition-colors duration-200"
             >
-              {/* teal rule that draws in on hover */}
-              <span className="absolute left-0 top-0 h-px w-0 bg-teal transition-all duration-300 group-hover:w-full" />
+              {/* accent rule that draws in on hover */}
+              <span className="absolute left-0 top-0 h-px w-0 bg-accent transition-all duration-300 group-hover:w-full" />
               <div className="flex items-start justify-between mb-7">
-                <Icon size={20} className="text-teal" strokeWidth={1.6} />
+                <Icon size={20} className="text-accent" strokeWidth={1.6} />
                 <span className="font-display text-2xl text-text-muted/60 leading-none tabular-nums">
                   {String(i + 1).padStart(2, "0")}
                 </span>
@@ -179,7 +179,7 @@ export default function HomePage() {
         <div className="grid sm:grid-cols-3 gap-10 sm:gap-8">
           {STEPS.map(({ n, title, body }) => (
             <div key={n} className="border-t border-border pt-6">
-              <span className="font-display text-5xl text-teal leading-none">{n}</span>
+              <span className="font-display text-5xl text-accent leading-none">{n}</span>
               <h3 className="mt-5 text-base font-semibold text-text-primary">{title}</h3>
               <p className="mt-2 text-[15px] text-text-secondary leading-relaxed">{body}</p>
             </div>
@@ -192,7 +192,7 @@ export default function HomePage() {
         <div
           aria-hidden
           className="pointer-events-none absolute right-0 bottom-0 w-[520px] h-[420px] rounded-full opacity-[0.13] blur-3xl"
-          style={{ background: "radial-gradient(circle, #15c489 0%, transparent 65%)" }}
+          style={{ background: "radial-gradient(circle, #f0a93c 0%, transparent 65%)" }}
         />
         <div className="relative mx-auto max-w-6xl px-6 lg:px-10 py-24 lg:py-28">
           <div className="grid lg:grid-cols-12 gap-10 items-end">
@@ -200,7 +200,7 @@ export default function HomePage() {
               <h2 className="font-display text-5xl sm:text-6xl lg:text-7xl leading-[0.98] tracking-[-0.02em] text-text-primary">
                 Let Kin carry
                 <br />
-                <em className="italic text-teal">the details.</em>
+                <em className="italic text-accent">the details.</em>
               </h2>
               <p className="mt-7 text-lg text-text-secondary max-w-md leading-relaxed">
                 Set up your family in a couple of minutes and start handing off the busywork.
@@ -209,7 +209,7 @@ export default function HomePage() {
             <div className="lg:col-span-4 lg:text-right">
               <Link
                 href="/signup"
-                className="press group inline-flex items-center gap-2.5 bg-teal hover:bg-teal-dim text-bg font-semibold rounded-lg px-8 py-4 text-[15px] transition-colors"
+                className="press group inline-flex items-center gap-2.5 bg-accent hover:bg-accent-dim text-bg font-semibold rounded-lg px-8 py-4 text-[15px] transition-colors"
               >
                 Get started free
                 <ArrowRight size={17} className="group-hover:translate-x-1 transition-transform duration-200" />

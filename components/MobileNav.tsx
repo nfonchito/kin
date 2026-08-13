@@ -51,7 +51,7 @@ export function MobileNav({ family }: MobileNavProps) {
           <button
             onClick={handleSignOut}
             disabled={signingOut}
-            className="p-1.5 text-text-muted hover:text-red-400 transition-colors"
+            className="p-1.5 text-text-muted hover:text-red-700 transition-colors"
           >
             <LogOut size={15} />
           </button>
@@ -70,7 +70,7 @@ export function MobileNav({ family }: MobileNavProps) {
               key={href}
               href={href}
               className={`flex-1 flex flex-col items-center gap-1 py-2.5 text-xs transition-colors ${
-                active ? "text-teal" : "text-text-muted"
+                active ? "text-accent" : "text-text-muted"
               }`}
             >
               <Icon size={20} strokeWidth={active ? 2.2 : 1.8} />

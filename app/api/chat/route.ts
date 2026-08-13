@@ -51,12 +51,12 @@ const CAL_CATEGORY: Record<string, string> = {
 };
 
 const CAL_COLOR: Record<string, string> = {
-  appointment: "#ec4899",
-  service: "#15c489",
-  sports: "#f59e0b",
-  school: "#6366f1",
-  social: "#8b5cf6",
-  general: "#6b7280",
+  appointment: "#be185d",
+  service: "#15803d",
+  sports: "#b45309",
+  school: "#4338ca",
+  social: "#6d28d9",
+  general: "#57534e",
 };
 
 interface CalEvent {
@@ -101,7 +101,7 @@ function buildCalendarEvent(
     title: activity.title,
     start_time,
     category,
-    color: CAL_COLOR[category] ?? "#6b7280",
+    color: CAL_COLOR[category] ?? "#57534e",
   };
 }
 

@@ -25,12 +25,12 @@ interface CalEvent {
 }
 
 const CATEGORY_COLORS: Record<string, string> = {
-  sports: "#f59e0b",
-  school: "#6366f1",
-  appointment: "#ec4899",
-  service: "#15c489",
-  social: "#8b5cf6",
-  general: "#6b7280",
+  sports: "#b45309",
+  school: "#4338ca",
+  appointment: "#be185d",
+  service: "#15803d",
+  social: "#6d28d9",
+  general: "#57534e",
 };
 
 interface CalendarViewProps {
@@ -191,14 +191,14 @@ export function CalendarView({ events: initialEvents, familyId }: CalendarViewPr
                 onClick={() => selectDay(day)}
                 className={`min-h-[64px] p-1.5 text-left border-b border-r border-border transition-colors relative ${
                   !inMonth ? "opacity-30" : "hover:bg-surface-2"
-                } ${isSelected ? "bg-teal-subtle" : ""}`}
+                } ${isSelected ? "bg-accent-subtle" : ""}`}
               >
                 <span
                   className={`text-xs font-medium w-6 h-6 flex items-center justify-center rounded-full ${
                     today
-                      ? "bg-teal text-bg"
+                      ? "bg-accent text-bg"
                       : isSelected
-                      ? "text-teal"
+                      ? "text-accent"
                       : "text-text-secondary"
                   }`}
                 >
@@ -211,8 +211,8 @@ export function CalendarView({ events: initialEvents, familyId }: CalendarViewPr
                       key={ev.id}
                       className="text-[9px] px-1 py-0.5 rounded truncate font-medium"
                       style={{
-                        backgroundColor: `${ev.color ?? CATEGORY_COLORS[ev.category] ?? "#6b7280"}20`,
-                        color: ev.color ?? CATEGORY_COLORS[ev.category] ?? "#6b7280",
+                        backgroundColor: `${ev.color ?? CATEGORY_COLORS[ev.category] ?? "#57534e"}20`,
+                        color: ev.color ?? CATEGORY_COLORS[ev.category] ?? "#57534e",
                       }}
                     >
                       {ev.title}
@@ -239,7 +239,7 @@ export function CalendarView({ events: initialEvents, familyId }: CalendarViewPr
             </h3>
             <button
               onClick={() => setShowForm(!showForm)}
-              className="flex items-center gap-1 text-xs text-teal hover:text-teal-dim transition-colors"
+              className="flex items-center gap-1 text-xs text-accent hover:text-accent-dim transition-colors"
             >
               <Plus size={12} />
               Add event
@@ -254,19 +254,19 @@ export function CalendarView({ events: initialEvents, familyId }: CalendarViewPr
                 onChange={(e) => setNewTitle(e.target.value)}
                 placeholder="Event name"
                 required
-                className="w-full bg-surface-2 border border-border rounded-lg px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-teal/40"
+                className="w-full bg-surface-2 border border-border rounded-lg px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent/40"
               />
               <div className="flex gap-2">
                 <input
                   type="time"
                   value={newTime}
                   onChange={(e) => setNewTime(e.target.value)}
-                  className="bg-surface-2 border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-teal/40"
+                  className="bg-surface-2 border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-accent/40"
                 />
                 <select
                   value={newCategory}
                   onChange={(e) => setNewCategory(e.target.value)}
-                  className="flex-1 bg-surface-2 border border-border rounded-lg px-3 py-2 text-sm text-text-secondary focus:outline-none focus:border-teal/40"
+                  className="flex-1 bg-surface-2 border border-border rounded-lg px-3 py-2 text-sm text-text-secondary focus:outline-none focus:border-accent/40"
                 >
                   <option value="general">General</option>
                   <option value="sports">Sports</option>
@@ -280,7 +280,7 @@ export function CalendarView({ events: initialEvents, familyId }: CalendarViewPr
                 <button
                   type="submit"
                   disabled={saving}
-                  className="flex-1 bg-teal hover:bg-teal-dim text-bg text-sm font-medium rounded-lg py-2 transition-colors disabled:opacity-50"
+                  className="flex-1 bg-accent hover:bg-accent-dim text-bg text-sm font-medium rounded-lg py-2 transition-colors disabled:opacity-50"
                 >
                   {saving ? "Saving…" : "Save"}
                 </button>
@@ -316,7 +316,7 @@ export function CalendarView({ events: initialEvents, familyId }: CalendarViewPr
                   </div>
                   <button
                     onClick={() => removeEvent(ev.id)}
-                    className="text-xs text-text-muted hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"
+                    className="text-xs text-text-muted hover:text-red-700 opacity-0 group-hover:opacity-100 transition-all"
                   >
                     Remove
                   </button>

@@ -7,8 +7,8 @@ export default function manifest(): MetadataRoute.Manifest {
     description: "A personal assistant for busy families — tasks, reminders, and your family calendar in one place.",
     start_url: "/dashboard",
     display: "standalone",
-    background_color: "#090907",
-    theme_color: "#090907",
+    background_color: "#fdf6e8",
+    theme_color: "#fdf6e8",
     icons: [
       { src: "/favicon.svg", sizes: "any", type: "image/svg+xml" },
       { src: "/manifest-icon", sizes: "192x192", type: "image/png", purpose: "any" },

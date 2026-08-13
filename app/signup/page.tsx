@@ -76,7 +76,7 @@ export default function SignupPage() {
             </p>
             <Link
               href="/login"
-              className="inline-block mt-6 text-sm font-medium text-teal hover:text-teal-dim transition-colors"
+              className="inline-block mt-6 text-sm font-medium text-accent hover:text-accent-dim transition-colors"
             >
               Go to sign in
             </Link>
@@ -121,7 +121,7 @@ export default function SignupPage() {
               onChange={(e) => setFamilyName(e.target.value)}
               placeholder="The Johnsons"
               required
-              className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-text-primary placeholder:text-text-muted text-sm focus:outline-none focus:border-teal transition-colors"
+              className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-text-primary placeholder:text-text-muted text-sm focus:outline-none focus:border-accent transition-colors"
             />
           </div>
 
@@ -133,7 +133,7 @@ export default function SignupPage() {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@example.com"
               required
-              className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-text-primary placeholder:text-text-muted text-sm focus:outline-none focus:border-teal transition-colors"
+              className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-text-primary placeholder:text-text-muted text-sm focus:outline-none focus:border-accent transition-colors"
             />
           </div>
 
@@ -146,12 +146,12 @@ export default function SignupPage() {
               placeholder="Min. 8 characters"
               minLength={8}
               required
-              className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-text-primary placeholder:text-text-muted text-sm focus:outline-none focus:border-teal transition-colors"
+              className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-text-primary placeholder:text-text-muted text-sm focus:outline-none focus:border-accent transition-colors"
             />
           </div>
 
           {error && (
-            <p className="text-sm text-red-400 bg-red-400/10 border border-red-400/20 rounded-lg px-3 py-2">
+            <p className="text-sm text-red-700 bg-red-700/8 border border-red-700/25 rounded-lg px-3 py-2">
               {error}
             </p>
           )}
@@ -159,7 +159,7 @@ export default function SignupPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-teal hover:bg-teal-dim text-bg font-semibold rounded-xl py-3 text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed mt-2"
+            className="w-full bg-accent hover:bg-accent-dim text-bg font-semibold rounded-xl py-3 text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed mt-2"
           >
             {loading ? "Creating your dashboard…" : "Create account"}
           </button>
@@ -167,7 +167,7 @@ export default function SignupPage() {
 
         <p className="text-center text-sm text-text-secondary mt-6">
           Already have an account?{" "}
-          <Link href="/login" className="text-teal hover:text-teal-dim transition-colors font-medium">
+          <Link href="/login" className="text-accent hover:text-accent-dim transition-colors font-medium">
             Sign in
           </Link>
         </p>

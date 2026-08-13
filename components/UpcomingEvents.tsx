@@ -26,12 +26,12 @@ function dayLabel(date: Date) {
 }
 
 const CATEGORY_COLORS: Record<string, string> = {
-  sports: "#f59e0b",
-  school: "#6366f1",
-  appointment: "#ec4899",
-  service: "#15c489",
-  social: "#8b5cf6",
-  general: "#6b7280",
+  sports: "#b45309",
+  school: "#4338ca",
+  appointment: "#be185d",
+  service: "#15803d",
+  social: "#6d28d9",
+  general: "#57534e",
 };
 
 const PREVIEW_KEY = "kin_calendar_events";
@@ -133,7 +133,7 @@ export function UpcomingEvents({ events: initialEvents, familyId }: UpcomingEven
         <div className="flex items-center gap-2">
           <h2 className="text-sm font-semibold text-text-primary">Upcoming</h2>
           {events.length > 0 && (
-            <span className="text-[10px] font-medium text-teal bg-teal-muted rounded-full px-1.5 py-0.5 leading-none">
+            <span className="text-[10px] font-medium text-accent bg-accent-muted rounded-full px-1.5 py-0.5 leading-none">
               {events.length}
             </span>
           )}
@@ -141,7 +141,7 @@ export function UpcomingEvents({ events: initialEvents, familyId }: UpcomingEven
         <button
           onClick={() => setShowForm(!showForm)}
           title="Add an event"
-          className="p-1 text-text-muted hover:text-teal transition-colors rounded-md hover:bg-teal-subtle"
+          className="p-1 text-text-muted hover:text-accent transition-colors rounded-md hover:bg-accent-subtle"
         >
           <Plus size={14} />
         </button>
@@ -155,7 +155,7 @@ export function UpcomingEvents({ events: initialEvents, familyId }: UpcomingEven
             onChange={(e) => setNewTitle(e.target.value)}
             placeholder="Event name"
             required
-            className="w-full bg-surface-2 border border-border rounded-lg px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-teal/40"
+            className="w-full bg-surface-2 border border-border rounded-lg px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent/40"
           />
           <div className="flex gap-2">
             <input
@@ -163,19 +163,19 @@ export function UpcomingEvents({ events: initialEvents, familyId }: UpcomingEven
               value={newDate}
               onChange={(e) => setNewDate(e.target.value)}
               required
-              className="flex-1 bg-surface-2 border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-teal/40"
+              className="flex-1 bg-surface-2 border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-accent/40"
             />
             <input
               type="time"
               value={newTime}
               onChange={(e) => setNewTime(e.target.value)}
-              className="w-24 bg-surface-2 border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-teal/40"
+              className="w-24 bg-surface-2 border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-accent/40"
             />
           </div>
           <select
             value={newCategory}
             onChange={(e) => setNewCategory(e.target.value)}
-            className="w-full bg-surface-2 border border-border rounded-lg px-3 py-2 text-sm text-text-secondary focus:outline-none focus:border-teal/40"
+            className="w-full bg-surface-2 border border-border rounded-lg px-3 py-2 text-sm text-text-secondary focus:outline-none focus:border-accent/40"
           >
             <option value="general">General</option>
             <option value="sports">Sports</option>
@@ -188,7 +188,7 @@ export function UpcomingEvents({ events: initialEvents, familyId }: UpcomingEven
             <button
               type="submit"
               disabled={saving}
-              className="flex-1 bg-teal hover:bg-teal-dim text-bg text-sm font-medium rounded-lg py-2 transition-colors disabled:opacity-50"
+              className="flex-1 bg-accent hover:bg-accent-dim text-bg text-sm font-medium rounded-lg py-2 transition-colors disabled:opacity-50"
             >
               {saving ? "Adding…" : "Add event"}
             </button>
@@ -207,16 +207,16 @@ export function UpcomingEvents({ events: initialEvents, familyId }: UpcomingEven
         {events.length === 0 && !showForm ? (
           <button
             onClick={() => setShowForm(true)}
-            className="w-full flex flex-col items-center gap-1.5 py-7 px-4 rounded-xl border border-dashed border-border hover:border-teal-subtle hover:bg-teal-subtle/40 transition-colors group"
+            className="w-full flex flex-col items-center gap-1.5 py-7 px-4 rounded-xl border border-dashed border-border hover:border-accent-subtle hover:bg-accent-subtle/40 transition-colors group"
           >
-            <CalendarDays size={18} className="text-text-muted group-hover:text-teal transition-colors" />
+            <CalendarDays size={18} className="text-text-muted group-hover:text-accent transition-colors" />
             <span className="text-sm text-text-secondary">Nothing scheduled yet</span>
             <span className="text-xs text-text-muted">Tap to add an event</span>
           </button>
         ) : (
           events.slice(0, 4).map((event) => {
             const date = new Date(event.start_time);
-            const color = event.color ?? CATEGORY_COLORS[event.category] ?? "#6b7280";
+            const color = event.color ?? CATEGORY_COLORS[event.category] ?? "#57534e";
             return (
               <div key={event.id} className="flex items-center gap-2.5 group">
                 <span
@@ -231,7 +231,7 @@ export function UpcomingEvents({ events: initialEvents, familyId }: UpcomingEven
                 </div>
                 <button
                   onClick={() => removeEvent(event.id)}
-                  className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity p-0.5 text-text-muted hover:text-red-400"
+                  className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity p-0.5 text-text-muted hover:text-red-700"
                 >
                   <X size={12} />
                 </button>

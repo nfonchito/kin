@@ -262,7 +262,7 @@ export function ChatInterface({ familyId, initialMessages }: ChatInterfaceProps)
             <button
               onClick={undoClear}
               disabled={clearing}
-              className="flex items-center gap-1.5 text-xs font-medium text-teal hover:text-teal-dim transition-colors disabled:opacity-50"
+              className="flex items-center gap-1.5 text-xs font-medium text-accent hover:text-accent-dim transition-colors disabled:opacity-50"
             >
               <RotateCcw size={12} />
               Undo
@@ -271,7 +271,7 @@ export function ChatInterface({ familyId, initialMessages }: ChatInterfaceProps)
         )}
 
         {clearError && (
-          <p className="mb-3 text-xs text-red-400 bg-red-400/10 border border-red-400/20 rounded-lg px-3 py-2">
+          <p className="mb-3 text-xs text-red-700 bg-red-700/8 border border-red-700/25 rounded-lg px-3 py-2">
             {clearError}
           </p>
         )}
@@ -290,7 +290,7 @@ export function ChatInterface({ familyId, initialMessages }: ChatInterfaceProps)
           </div>
         )}
 
-        <div className="flex items-end gap-2 bg-surface border border-border rounded-2xl px-4 py-3 focus-within:border-teal/40 transition-colors">
+        <div className="flex items-end gap-2 bg-surface border border-border rounded-2xl px-4 py-3 focus-within:border-accent/40 transition-colors">
           <textarea
             ref={inputRef}
             value={input}
@@ -304,7 +304,7 @@ export function ChatInterface({ familyId, initialMessages }: ChatInterfaceProps)
           <button
             onClick={() => sendMessage(input)}
             disabled={!input.trim() || loading}
-            className="press shrink-0 p-2 bg-teal hover:bg-teal-dim text-bg rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="press shrink-0 p-2 bg-accent hover:bg-accent-dim text-bg rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <Send size={14} />
           </button>
@@ -333,7 +333,7 @@ function MessageBubble({ message }: { message: Message }) {
         <div
           className={`px-4 py-3 rounded-2xl text-sm leading-relaxed ${
             isUser
-              ? "bg-teal text-bg rounded-br-sm font-medium shadow-sm shadow-teal/20"
+              ? "bg-accent text-bg rounded-br-sm font-medium shadow-sm shadow-accent/20"
               : "bg-surface-2 text-text-primary border border-border rounded-bl-sm shadow-sm shadow-black/20"
           }`}
         >
@@ -370,7 +370,7 @@ function EmptyState({ onSuggestion }: { onSuggestion: (s: string) => void }) {
   return (
     <div className="flex flex-col items-center justify-center h-full text-center py-16 px-4">
       <div className="mb-4 opacity-60">
-        <Sparkles size={28} className="text-teal mx-auto" />
+        <Sparkles size={28} className="text-accent mx-auto" />
       </div>
       <h3 className="text-base font-medium text-text-primary mb-2">
         Kin is ready to help

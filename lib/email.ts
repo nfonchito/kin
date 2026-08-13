@@ -110,7 +110,7 @@ export async function sendReminderEmail(opts: {
   const html = `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
                 max-width: 560px; margin: 0 auto; padding: 32px 24px; color: #111;">
-      <p style="margin: 0 0 4px; font-size: 13px; color: #15c489; font-weight: 600;
+      <p style="margin: 0 0 4px; font-size: 13px; color: #c2610c; font-weight: 600;
                 letter-spacing: 0.05em; text-transform: uppercase;">Kin Family Assistant</p>
       <h1 style="margin: 0 0 6px; font-size: 20px; font-weight: 700;">${escapeHtml(heading)}</h1>
       <p style="margin: 0 0 24px; font-size: 15px; color: #555;">
@@ -123,7 +123,7 @@ export async function sendReminderEmail(opts: {
 
       <p style="margin: 24px 0 0;">
         <a href="https://kinfamily.app/dashboard/calendar"
-           style="display: inline-block; background: #15c489; color: #06231a; text-decoration: none;
+           style="display: inline-block; background: #c2610c; color: #fdf6e8; text-decoration: none;
                   font-weight: 600; font-size: 14px; padding: 10px 18px; border-radius: 10px;">
           Open your calendar
         </a>
@@ -160,7 +160,7 @@ function renderTaskHtml(n: TaskNotification): string {
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
                 max-width: 560px; margin: 0 auto; padding: 32px 24px; color: #111;">
 
-      <p style="margin: 0 0 4px; font-size: 13px; color: #15c489; font-weight: 600;
+      <p style="margin: 0 0 4px; font-size: 13px; color: #c2610c; font-weight: 600;
                 letter-spacing: 0.05em; text-transform: uppercase;">Kin Family Assistant</p>
       <h1 style="margin: 0 0 24px; font-size: 20px; font-weight: 700;">
         New request received
@@ -189,8 +189,8 @@ function renderTaskHtml(n: TaskNotification): string {
       </table>
 
       <div style="margin-bottom: 32px;">
-        <span style="display: inline-block; padding: 4px 10px; background: #f0fdf9;
-                     color: #15c489; border: 1px solid #bbf0e0; border-radius: 20px;
+        <span style="display: inline-block; padding: 4px 10px; background: #fdf3e3;
+                     color: #c2610c; border: 1px solid #f0d9b8; border-radius: 20px;
                      font-size: 12px; font-weight: 500;">
           ${category}
         </span>

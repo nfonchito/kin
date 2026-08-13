@@ -56,7 +56,7 @@ export function GoogleSignInButton({ label = "Continue with Google" }: { label?:
       </button>
 
       {error && (
-        <p className="mt-2 text-xs text-red-400 bg-red-400/10 border border-red-400/20 rounded-lg px-3 py-2">
+        <p className="mt-2 text-xs text-red-700 bg-red-700/8 border border-red-700/25 rounded-lg px-3 py-2">
           {error}
         </p>
       )}

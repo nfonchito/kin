@@ -17,7 +17,7 @@ export default async function DashboardPage() {
             <div
               aria-hidden
               className="pointer-events-none absolute -top-28 -left-20 w-96 h-56 rounded-full opacity-[0.13] blur-3xl"
-              style={{ background: "radial-gradient(circle, #15c489 0%, transparent 70%)" }}
+              style={{ background: "radial-gradient(circle, #f0a93c 0%, transparent 70%)" }}
             />
             <div className="relative">
               <TodayLabel className="mb-1.5" />
@@ -75,11 +75,11 @@ export default async function DashboardPage() {
     <div className="flex flex-col lg:flex-row h-full min-h-[calc(100vh-56px)] lg:min-h-screen">
       <div className="flex-1 flex flex-col min-h-[60vh] lg:min-h-0">
         <div className="relative px-5 pt-6 pb-5 border-b border-border overflow-hidden">
-          {/* soft teal wash, echoes the landing page hero */}
+          {/* soft accent wash, echoes the landing page hero */}
           <div
             aria-hidden
             className="pointer-events-none absolute -top-24 -left-16 w-72 h-48 rounded-full opacity-[0.07] blur-3xl"
-            style={{ background: "radial-gradient(circle, #15c489 0%, transparent 70%)" }}
+            style={{ background: "radial-gradient(circle, #f0a93c 0%, transparent 70%)" }}
           />
           <div className="relative">
             <TodayLabel className="mb-1.5" />

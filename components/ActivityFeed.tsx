@@ -37,20 +37,22 @@ const STATUS_CONFIG = {
   in_progress: {
     icon: Loader2,
     label: "In progress",
-    color: "text-yellow-400",
-    dot: "bg-yellow-400",
+    color: "text-amber-700",
+    dot: "bg-amber-700",
   },
   done: {
     icon: CheckCircle2,
+    // Green, not the brand accent — "done" shouldn't read the same as
+    // in-progress amber or the accent used everywhere else.
     label: "Done",
-    color: "text-teal",
-    dot: "bg-teal",
+    color: "text-green-700",
+    dot: "bg-green-700",
   },
   cancelled: {
     icon: XCircle,
     label: "Cancelled",
-    color: "text-red-400",
-    dot: "bg-red-400",
+    color: "text-red-700",
+    dot: "bg-red-700",
   },
 };
 
@@ -86,7 +88,7 @@ export function ActivityFeed({ activities: initialActivities, familyId }: Activi
               onClick={() => setFilter(f)}
               className={`px-2.5 py-1 rounded-lg text-xs capitalize transition-colors ${
                 filter === f
-                  ? "bg-teal-muted text-teal font-medium"
+                  ? "bg-accent-muted text-accent font-medium"
                   : "text-text-muted hover:text-text-secondary hover:bg-surface-3"
               }`}
             >
@@ -156,7 +158,7 @@ function ActivityItem({
             className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity p-0.5"
             title="Mark done"
           >
-            <CheckCircle2 size={16} className="text-text-muted hover:text-teal transition-colors" />
+            <CheckCircle2 size={16} className="text-text-muted hover:text-green-700 transition-colors" />
           </button>
         )}
       </div>

@@ -94,7 +94,7 @@ export default function LoginPage() {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@example.com"
               required
-              className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-text-primary placeholder:text-text-muted text-sm focus:outline-none focus:border-teal transition-colors"
+              className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-text-primary placeholder:text-text-muted text-sm focus:outline-none focus:border-accent transition-colors"
             />
           </div>
 
@@ -106,12 +106,12 @@ export default function LoginPage() {
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
               required
-              className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-text-primary placeholder:text-text-muted text-sm focus:outline-none focus:border-teal transition-colors"
+              className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-text-primary placeholder:text-text-muted text-sm focus:outline-none focus:border-accent transition-colors"
             />
           </div>
 
           {error && (
-            <p className="text-sm text-red-400 bg-red-400/10 border border-red-400/20 rounded-lg px-3 py-2">
+            <p className="text-sm text-red-700 bg-red-700/8 border border-red-700/25 rounded-lg px-3 py-2">
               {error}
             </p>
           )}
@@ -119,7 +119,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-teal hover:bg-teal-dim text-bg font-semibold rounded-xl py-3 text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed mt-2"
+            className="w-full bg-accent hover:bg-accent-dim text-bg font-semibold rounded-xl py-3 text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed mt-2"
           >
             {loading ? "Signing in…" : "Sign in"}
           </button>
@@ -127,7 +127,7 @@ export default function LoginPage() {
 
         <p className="text-center text-sm text-text-secondary mt-6">
           New to Kin?{" "}
-          <Link href="/signup" className="text-teal hover:text-teal-dim transition-colors font-medium">
+          <Link href="/signup" className="text-accent hover:text-accent-dim transition-colors font-medium">
             Create an account
           </Link>
         </p>

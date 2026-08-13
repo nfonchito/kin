@@ -71,12 +71,12 @@ export function Sidebar({ family, userEmail }: SidebarProps) {
               href={href}
               className={`relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-150 ${
                 active
-                  ? "bg-teal-muted text-teal font-medium"
+                  ? "bg-accent-muted text-accent font-medium"
                   : "text-text-secondary hover:text-text-primary hover:bg-surface-3"
               }`}
             >
               {active && (
-                <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[3px] rounded-r-full bg-teal" />
+                <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[3px] rounded-r-full bg-accent" />
               )}
               <Icon size={16} strokeWidth={active ? 2.2 : 1.8} />
               {label}
@@ -92,7 +92,7 @@ export function Sidebar({ family, userEmail }: SidebarProps) {
         </div>
         <button
           onClick={handleSignOut}
-          className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm text-text-secondary hover:text-red-400 hover:bg-red-400/10 transition-colors"
+          className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm text-text-secondary hover:text-red-700 hover:bg-red-700/8 transition-colors"
         >
           <LogOut size={16} strokeWidth={1.8} />
           Sign out
