@@ -47,14 +47,14 @@ export default function OpengraphImage() {
           </div>
         </div>
         <div style={{ fontSize: 68, fontWeight: 800, color: "#4a3a24", lineHeight: 1.1, letterSpacing: "-0.03em" }}>
-          The mental load of running
+          The details of running
         </div>
         <div style={{ display: "flex", fontSize: 68, fontWeight: 800, lineHeight: 1.1, letterSpacing: "-0.03em" }}>
           <span style={{ color: "#4a3a24" }}>a home,&nbsp;</span>
-          <span style={{ color: "#c2610c" }}>handled.</span>
+          <span style={{ color: "#c2610c" }}>out of your head.</span>
         </div>
         <div style={{ fontSize: 30, color: "#7c6b4e", marginTop: 32 }}>
-          Tasks, reminders, and your family calendar — in one place.
+          Your calendar, your list, and a note each morning.
         </div>
       </div>
     ),

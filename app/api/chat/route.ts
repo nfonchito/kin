@@ -329,20 +329,21 @@ function generateResponse(
 
   switch (intent) {
 
+    // No, and there is no "Kin coordinator" or "Kin team" — saying so left
+    // people waiting on a call that was never going to happen.
     case "capability_question":
       return { reply: pick([
-        "Not yet — right now I understand and track your requests, but the actual bookings are handled by your Kin coordinator. Full automation is coming. Want me to queue this up?",
-        "Honest answer: not fully on my own yet. I capture everything so nothing falls through the cracks, and your Kin team acts on it. Should I add this to your list?",
-        "Not autonomously yet — think of me as the layer that never forgets. I log it, your Kin team handles it. Want me to put this in the queue?",
+        "No — I don't call or book anything. What I do is remember it: I put it on your calendar and email you each morning with what's coming up. The booking itself is still yours to make.",
+        "Straight answer: no. I'm the memory, not the hands — I write it down, schedule it, and remind you. Making the call is still on you.",
       ]) };
 
     case "what_is_kin": {
       const knows = ctx.name === "your family" ? "your family" : `the ${ctx.name}`;
-      return { reply: `I'm Kin — your family's assistant. I handle the mental load of running a household: booking services, reminders, calendar, errands. I know ${knows} and your home in ${ctx.neighborhood}, so you don't have to re-explain things each time. What can I take off your plate?` };
+      return { reply: `I'm Kin — somewhere to put everything the house needs so you're not holding it in your head. Tell me in plain English and I'll get it on your calendar, keep a list, and email you each morning with what's ahead. I know ${knows} and your home in ${ctx.neighborhood}, so you don't have to re-explain things. I don't book services or make calls — that part's still yours.` };
     }
 
     case "where_live":
-      return { reply: `You're in ${ctx.neighborhood}, ${ctx.city}, ${ctx.state} ${ctx.zip}. I've got your neighborhood dialed in for local vendors and services.` };
+      return { reply: `You're in ${ctx.neighborhood}, ${ctx.city}, ${ctx.state} ${ctx.zip}. I'll use that whenever a request depends on where you are.` };
 
     case "family_members":
       if (ctx.members.length === 0)
@@ -389,19 +390,19 @@ function generateResponse(
       const yard = ctx.preferences?.yard_type ? ` (${ctx.preferences.yard_type} yard)` : "";
       return {
         reply: recurrence
-          ? `Got it — recurring lawn care ${recurrence}${yard}. I'll set up a standing booking with a crew near ${ctx.neighborhood}.`
+          ? `Noted — lawn care ${recurrence}${yard}. I'll flag each one in your morning email.`
           : pick([
-              `Got it — lawn care for ${whenStr}${yard}. I'll line up a crew near ${ctx.neighborhood} and confirm once it's booked.`,
-              `On it — I'll arrange lawn care for ${whenStr}${yard} with a trusted vendor in ${ctx.neighborhood}.`,
+              `Noted — lawn care for ${whenStr}${yard}. It's on your list and I'll remind you.`,
+              `Got it — lawn care ${whenStr}${yard}. Written down so it doesn't get lost.`,
             ]),
-        activity: { title: `Lawn care — ${recurrence ?? when ?? "this week"}`, category: "lawn", status: "in_progress" },
+        activity: { title: `Lawn care — ${recurrence ?? when ?? "this week"}`, category: "lawn", status: "pending" },
       };
     }
 
     case "task_lawn_followup":
       return { reply: pick([
-        "Already on it — confirmation coming shortly. Any special instructions for the crew?",
-        "It's in the queue. Anything extra this time — edging, weeding?",
+        "It's on the list. Anything else worth writing down — gate code, edging, weeding?",
+        "Noted. Any details about it I should keep with the entry?",
       ]) };
 
     case "task_reminder": {
@@ -417,32 +418,32 @@ function generateResponse(
       }
       return {
         reply: recurrence
-          ? `Done — I'll remind ${who} ${verb} ${about}${timing}, on repeat. I'll keep it going until you tell me to stop.`
+          ? `Done — ${about}${timing}, on repeat. Each one shows up in your morning email.`
           : pick([
-              `Done — I'll remind ${who} ${verb} ${about}${timing}. A heads-up goes out ahead of time.`,
-              `Got it — reminder set${who !== "you" ? ` for ${who}` : ""} ${verb} ${about}${timing}.`,
+              `Done — ${about}${timing}. It'll be in your morning email that day.`,
+              `Got it — noted${who !== "you" ? ` for ${who}` : ""}: ${about}${timing}.`,
             ]),
         activity: { title: `Reminder${who !== "you" ? ` for ${who}` : ""}: ${about}${recurTag}`, category: "reminder", status: "pending" },
       };
     }
 
     case "task_reminder_followup":
-      return { reply: "Reminder is set — I'll make sure it lands at the right time. Anything else?" };
+      return { reply: "It's on the list — you'll see it in your morning email. Anything else?" };
 
     case "task_cleaning": {
       const size = ctx.preferences?.home_size ? ` for your ${ctx.preferences.home_size} home` : "";
       return {
         reply: recurrence
-          ? `I'll set up recurring cleaning${size} ${recurrence}. Same crew each time, and any focus areas you want me to flag?`
+          ? `Noted — cleaning${size} ${recurrence}. Any focus areas worth recording?`
           : when
-            ? `I'll coordinate cleaning${size} for ${when}. Any focus areas, or the usual full house?`
-            : `I'll set up cleaning${size}. What day works best — and any focus areas?`,
+            ? `Noted — cleaning${size} for ${when}. Any focus areas, or the usual full house?`
+            : `Happy to write that down. What day works — and any focus areas?`,
         activity: { title: `House cleaning${recurrence ? ` — ${recurrence}` : when ? ` — ${when}` : ""}`, category: "general", status: "pending" },
       };
     }
 
     case "task_cleaning_followup":
-      return { reply: "Got it — I'll note that for the cleaners. Anything else to add?" };
+      return { reply: "Noted with the entry. Anything else to add?" };
 
     case "task_grocery": {
       const diet = ctx.preferences?.dietary_notes ? ` (noting ${ctx.preferences.dietary_notes})` : "";
@@ -461,14 +462,14 @@ function generateResponse(
       if (when) {
         return {
           reply: pick([
-            `Done — I've got the ${what}${forWhom} down for ${when}. I'll have your Kin coordinator confirm the booking.`,
-            `Got it — ${what}${forWhom}, ${when}. We'll lock in the appointment and confirm shortly.`,
+            `Got it — ${what}${forWhom}, ${when}. Making the actual appointment is still yours.`,
+            `Noted — ${what}${forWhom} down for ${when}, and in your morning email that day.`,
           ]),
-          activity: { title: `${cap(what)}${forWhom}`, category: "booking", status: "in_progress" },
+          activity: { title: `${cap(what)}${forWhom}`, category: "booking", status: "pending" },
         };
       }
       return {
-        reply: `Sure — I'll set up the ${what}${forWhom}. What day and time should I aim for?`,
+        reply: `Sure — what day and time? I'll put the ${what}${forWhom} on your calendar.`,
         activity: { title: `${cap(what)}${forWhom}`, category: "booking", status: "pending" },
       };
     }
@@ -478,25 +479,25 @@ function generateResponse(
       const whenStr = whenPhrase(when);
       return {
         reply: (when || person)
-          ? `Got it — I'll sort the pickup/drop-off${forWhom ? ` for${forWhom}` : ""}${whenStr} and confirm the ride details.`
-          : `I can set up a ride. Who needs to go where, and when?`,
+          ? `Noted — pickup/drop-off${forWhom ? ` for${forWhom}` : ""}${whenStr}.`
+          : `Happy to note that down. Who needs to go where, and when?`,
         activity: { title: stripWhen(extractEventTitle(msg)).slice(0, 60) || "Transportation", category: "general", status: "pending" },
       };
     }
 
     case "task_dinner": {
-      const diet = ctx.preferences?.dietary_notes ? ` (keeping ${ctx.preferences.dietary_notes} in mind)` : "";
+      const diet = ctx.preferences?.dietary_notes ? ` (I've got ${ctx.preferences.dietary_notes} on file)` : "";
       const whenStr = when ? ` for ${when}` : "";
       return {
-        reply: `On it${diet} — dinner${whenStr}. Want a few spots near ${ctx.neighborhood}, or are you cooking?`,
+        reply: `Noted — dinner${whenStr}${diet}. Anything to add to the list for it?`,
         activity: { title: `Dinner${when ? ` — ${when}` : ""}`, category: "errand", status: "pending" },
       };
     }
 
     case "task_home_service":
       return {
-        reply: `I'll find a reliable vendor in ${ctx.neighborhood} for that.${when ? ` Aiming for ${when}.` : " When works for you?"} Anything about the issue I should pass along?`,
-        activity: { title: stripWhen(extractEventTitle(msg)).slice(0, 60) || "Home service", category: "general", status: "in_progress" },
+        reply: `Noted${when ? ` for ${when}` : ""}. Anything about the issue worth writing down while it's fresh?${when ? "" : " What day works?"}`,
+        activity: { title: stripWhen(extractEventTitle(msg)).slice(0, 60) || "Home service", category: "general", status: "pending" },
       };
 
     case "add_to_calendar": {

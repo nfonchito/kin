@@ -4,38 +4,38 @@ import { KinLogo } from "@/components/KinLogo";
 import { MessageSquareText, CalendarDays, BellRing, Home, ArrowRight } from "lucide-react";
 
 export const metadata: Metadata = {
-  title: "Kin — A personal assistant for busy families",
+  title: "Kin — Keep the whole household in one place",
   description:
-    "Kin handles the mental load of running a household — tasks, reminders, and your family calendar in one place. Just tell it what you need.",
+    "Tell Kin what the house needs in plain English. It puts it on your calendar, keeps the list, and emails you each morning with what's ahead.",
 };
 
 const FEATURES = [
   {
     icon: MessageSquareText,
-    title: "Just ask",
-    body: "Tell Kin what you need in plain language — “book lawn care Saturday,” “remind David about soccer Thursday.” It understands and takes it from there.",
+    title: "Write it like a text",
+    body: "“lawn care every Thursday.” “dentist for Emma Friday at 2.” Kin picks out the date, the person and the task, and files it — no forms, no fiddling.",
   },
   {
     icon: CalendarDays,
-    title: "One family calendar",
-    body: "Appointments, practices, and bookings land on a shared calendar automatically, so the whole household stays in sync.",
+    title: "It lands on a calendar",
+    body: "Appointments, practices and recurring jobs all sit in one view, repeats included. Say it once and every Thursday is there.",
   },
   {
     icon: BellRing,
-    title: "Nothing slips",
-    body: "Reminders and tasks are tracked for you — the dentist, the field trip, the renewal — so you can stop holding it all in your head.",
+    title: "A note every morning",
+    body: "One short email each day with what's coming in the next 24 hours — the dentist, the field trip, the renewal.",
   },
   {
     icon: Home,
-    title: "Knows your household",
-    body: "Kin remembers your family, your home, and your preferences, so you never have to re-explain the basics.",
+    title: "Remembers your household",
+    body: "Your family, your home, your preferences — stored once, so you never re-explain who Emma is or how big the yard is.",
   },
 ];
 
 const STEPS = [
-  { n: "1", title: "Tell Kin what you need", body: "Type it like you'd text a friend." },
-  { n: "2", title: "Kin captures and organizes it", body: "Onto your calendar and task list, instantly." },
-  { n: "3", title: "Stay present", body: "Kin handles the details in the background." },
+  { n: "1", title: "Type what the house needs", body: "The way you'd text it to someone." },
+  { n: "2", title: "Kin files it", body: "Onto your calendar and your list, straight away." },
+  { n: "3", title: "It reminds you", body: "A short email each morning, so nothing depends on remembering." },
 ];
 
 export default function HomePage() {
@@ -78,15 +78,15 @@ export default function HomePage() {
                 Your family&apos;s personal assistant
               </p>
               <h1 className="font-display text-[3.25rem] sm:text-7xl lg:text-[5.25rem] leading-[0.95] tracking-[-0.02em] text-text-primary">
-                The mental load
+                The details
                 <br />
                 of running a home,
                 <br />
-                <em className="italic text-accent">handled.</em>
+                <em className="italic text-accent">out of your head.</em>
               </h1>
               <p className="mt-8 text-lg text-text-secondary max-w-md leading-relaxed">
-                Kin keeps track of your household — tasks, reminders, and the family calendar — so
-                nothing slips through the cracks. Just tell it what you need.
+                Tell Kin what the house needs in plain English. It puts it on your calendar, keeps
+                the list, and emails you each morning with what&apos;s ahead.
               </p>
               <div className="mt-10 flex flex-col sm:flex-row sm:items-center gap-3">
                 <Link
@@ -185,6 +185,23 @@ export default function HomePage() {
             </div>
           ))}
         </div>
+
+        {/* Say the limits out loud — better than a user waiting on a call
+            that was never coming. */}
+        <div className="mt-16 border-t border-border pt-6 max-w-2xl">
+          <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-text-muted mb-3">
+            What it doesn&apos;t do
+          </p>
+          <p className="text-[15px] text-text-secondary leading-relaxed">
+            Kin doesn&apos;t phone the plumber or book the dentist — it remembers that you need to,
+            and makes sure the date doesn&apos;t get lost. It&apos;s one login per household today,
+            and it&apos;s early, so tell us what&apos;s missing:{" "}
+            <a href="mailto:hello@kinfamily.app" className="text-accent hover:text-accent-dim transition-colors">
+              hello@kinfamily.app
+            </a>
+            .
+          </p>
+        </div>
       </section>
 
       {/* Closing CTA — full-bleed and weighty */}
@@ -198,12 +215,13 @@ export default function HomePage() {
           <div className="grid lg:grid-cols-12 gap-10 items-end">
             <div className="lg:col-span-8">
               <h2 className="font-display text-5xl sm:text-6xl lg:text-7xl leading-[0.98] tracking-[-0.02em] text-text-primary">
-                Let Kin carry
+                Let Kin remember
                 <br />
                 <em className="italic text-accent">the details.</em>
               </h2>
               <p className="mt-7 text-lg text-text-secondary max-w-md leading-relaxed">
-                Set up your family in a couple of minutes and start handing off the busywork.
+                Set your family up in a couple of minutes. It&apos;s free, and there&apos;s nothing
+                to install.
               </p>
             </div>
             <div className="lg:col-span-4 lg:text-right">

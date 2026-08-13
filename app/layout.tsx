@@ -11,14 +11,15 @@ export const metadata: Metadata = {
     template: "%s · Kin",
   },
   description:
-    "Kin is a personal assistant for busy families — it organizes tasks, reminders, and your family calendar so nothing falls through the cracks.",
+    "Tell Kin what the house needs in plain English. It keeps the calendar, keeps the list, and emails you each morning with what's ahead.",
   applicationName: "Kin",
-  keywords: ["family assistant", "household organizer", "family calendar", "reminders", "Kin"],
-  appleWebApp: { capable: true, title: "Kin", statusBarStyle: "black-translucent" },
+  keywords: ["family organizer", "household organizer", "family calendar", "reminders", "Kin"],
+  // "default" now the app is light — black-translucent was for the dark theme.
+  appleWebApp: { capable: true, title: "Kin", statusBarStyle: "default" },
   openGraph: {
     title: "Kin — Family Assistant",
     description:
-      "A personal assistant for busy families. Organize tasks, reminders, and your family calendar in one place.",
+      "Tell Kin what the house needs in plain English. It keeps the calendar and emails you each morning with what's ahead.",
     url: siteUrl,
     siteName: "Kin",
     type: "website",
@@ -28,7 +29,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Kin — Family Assistant",
     description:
-      "A personal assistant for busy families. Organize tasks, reminders, and your family calendar in one place.",
+      "Tell Kin what the house needs in plain English. It keeps the calendar and emails you each morning with what's ahead.",
   },
 };
 
