@@ -54,7 +54,10 @@ export function CalendarView({ events: initialEvents, familyId }: CalendarViewPr
     } catch {}
   }, [familyId]);
   const [showForm, setShowForm] = useState(false);
+  // Set while editing an existing row; null means the form is adding a new one.
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [newTitle, setNewTitle] = useState("");
+  const [newDate, setNewDate] = useState("");
   const [newTime, setNewTime] = useState("09:00");
   const [newCategory, setNewCategory] = useState("general");
   const [saving, setSaving] = useState(false);
@@ -71,50 +74,83 @@ export function CalendarView({ events: initialEvents, familyId }: CalendarViewPr
 
   function selectDay(day: Date) {
     setSelected(isSameDay(day, selected ?? new Date(0)) ? null : day);
-    setShowForm(false);
+    closeForm();
   }
 
-  async function addEvent(e: React.FormEvent) {
+  function closeForm() {
+    setShowForm(false);
+    setEditingId(null);
+  }
+
+  function openAdd(day: Date) {
+    setEditingId(null);
+    setNewTitle("");
+    setNewDate(format(day, "yyyy-MM-dd"));
+    setNewTime("09:00");
+    setNewCategory("general");
+    setShowForm(true);
+  }
+
+  // Prefill from the row so every field can be corrected — including the date,
+  // since an event on the wrong day was the main reason to delete and retype.
+  function openEdit(ev: CalEvent) {
+    const at = new Date(ev.start_time);
+    setEditingId(ev.id);
+    setNewTitle(ev.title);
+    setNewDate(format(at, "yyyy-MM-dd"));
+    setNewTime(format(at, "HH:mm"));
+    setNewCategory(ev.category ?? "general");
+    setShowForm(true);
+  }
+
+  async function saveEvent(e: React.FormEvent) {
     e.preventDefault();
-    if (!newTitle || !selected || !familyId) return;
+    if (!newTitle || !newDate || !familyId) return;
 
     setSaving(true);
-    const start_time = new Date(
-      `${format(selected, "yyyy-MM-dd")}T${newTime}`
-    ).toISOString();
+    const start_time = new Date(`${newDate}T${newTime}`).toISOString();
+    const fields = {
+      title: newTitle,
+      start_time,
+      category: newCategory,
+      color: CATEGORY_COLORS[newCategory],
+    };
 
     if (isPreview(familyId)) {
-      const newEvent: CalEvent = {
-        id: Date.now().toString(),
-        title: newTitle,
-        start_time,
-        category: newCategory,
-        color: CATEGORY_COLORS[newCategory],
-      };
       setEvents((prev) => {
-        const updated = [...prev, newEvent];
+        const updated = editingId
+          ? prev.map((ev) => (ev.id === editingId ? { ...ev, ...fields } : ev))
+          : [...prev, { id: Date.now().toString(), ...fields }];
         localStorage.setItem(PREVIEW_KEY, JSON.stringify(updated));
         return updated;
       });
+    } else if (editingId) {
+      const res = await fetch("/api/events", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: editingId, ...fields }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setEvents((prev) => prev.map((ev) => (ev.id === editingId ? data : ev)));
+      }
     } else {
       const res = await fetch("/api/events", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          family_id: familyId,
-          title: newTitle,
-          start_time,
-          category: newCategory,
-          color: CATEGORY_COLORS[newCategory],
-        }),
+        body: JSON.stringify(fields),
       });
-      const data = await res.json();
-      setEvents((prev) => [...prev, data]);
+      if (res.ok) {
+        const data = await res.json();
+        setEvents((prev) => [...prev, data]);
+      }
     }
 
+    // Follow the event if it was moved to another day, so it isn't just gone.
+    if (editingId) setSelected(new Date(`${newDate}T${newTime}`));
     setNewTitle("");
     setNewTime("09:00");
-    setShowForm(false);
+    closeForm();
     setSaving(false);
   }
 
@@ -238,7 +274,7 @@ export function CalendarView({ events: initialEvents, familyId }: CalendarViewPr
               {isToday(selected) ? "Today" : format(selected, "EEEE, MMMM d")}
             </h3>
             <button
-              onClick={() => setShowForm(!showForm)}
+              onClick={() => (showForm ? closeForm() : openAdd(selected))}
               className="flex items-center gap-1 text-xs text-accent hover:text-accent-dim transition-colors"
             >
               <Plus size={12} />
@@ -247,7 +283,7 @@ export function CalendarView({ events: initialEvents, familyId }: CalendarViewPr
           </div>
 
           {showForm && (
-            <form onSubmit={addEvent} className="space-y-2 mb-4 animate-slide-up">
+            <form onSubmit={saveEvent} className="space-y-2 mb-4 animate-slide-up">
               <input
                 type="text"
                 value={newTitle}
@@ -257,6 +293,13 @@ export function CalendarView({ events: initialEvents, familyId }: CalendarViewPr
                 className="w-full bg-surface-2 border border-border rounded-lg px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent/40"
               />
               <div className="flex gap-2">
+                <input
+                  type="date"
+                  value={newDate}
+                  onChange={(e) => setNewDate(e.target.value)}
+                  required
+                  className="bg-surface-2 border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-accent/40"
+                />
                 <input
                   type="time"
                   value={newTime}
@@ -282,11 +325,11 @@ export function CalendarView({ events: initialEvents, familyId }: CalendarViewPr
                   disabled={saving}
                   className="flex-1 bg-accent-soft hover:bg-accent-soft-dim text-text-primary text-sm font-medium rounded-lg py-2 transition-colors disabled:opacity-50"
                 >
-                  {saving ? "Saving…" : "Save"}
+                  {saving ? "Saving…" : editingId ? "Save changes" : "Save"}
                 </button>
                 <button
                   type="button"
-                  onClick={() => setShowForm(false)}
+                  onClick={closeForm}
                   className="px-3 text-sm text-text-muted hover:text-text-secondary bg-surface-2 rounded-lg"
                 >
                   Cancel
@@ -314,12 +357,20 @@ export function CalendarView({ events: initialEvents, familyId }: CalendarViewPr
                       {format(new Date(ev.start_time), "h:mm a")}
                     </p>
                   </div>
-                  <button
-                    onClick={() => removeEvent(ev.id)}
-                    className="text-xs text-text-muted hover:text-red-700 opacity-0 group-hover:opacity-100 transition-all"
-                  >
-                    Remove
-                  </button>
+                  <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-all">
+                    <button
+                      onClick={() => openEdit(ev)}
+                      className="text-xs text-text-muted hover:text-accent transition-colors"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => removeEvent(ev.id)}
+                      className="text-xs text-text-muted hover:text-red-700 transition-colors"
+                    >
+                      Remove
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
