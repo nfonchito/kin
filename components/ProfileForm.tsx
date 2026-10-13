@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, Trash2, User, Home, Settings2, Mail } from "lucide-react";
+import { Plus, Trash2, User, Home, Settings2, Mail, Download, ShieldAlert } from "lucide-react";
 
 interface Family {
   id: string;
@@ -78,6 +78,10 @@ export function ProfileForm({ family, members: initialMembers, preferences: init
   const [savingFamily, setSavingFamily] = useState(false);
   const [savingPrefs, setSavingPrefs] = useState(false);
   const [saved, setSaved] = useState<string | null>(null);
+  const [confirmText, setConfirmText] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
+  const [showDelete, setShowDelete] = useState(false);
   const [testingReminder, setTestingReminder] = useState(false);
   const [reminderResult, setReminderResult] = useState<{ ok: boolean; message: string } | null>(null);
 
@@ -96,6 +100,30 @@ export function ProfileForm({ family, members: initialMembers, preferences: init
       setReminderResult({ ok: false, message: "Couldn't reach the server. Try again." });
     } finally {
       setTestingReminder(false);
+    }
+  }
+
+  async function deleteAccount() {
+    setDeleting(true);
+    setDeleteError("");
+    try {
+      const res = await fetch("/api/account", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirm: confirmText }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        // The session is gone with the account — a full load, not a client
+        // navigation, so nothing stale is left in memory.
+        window.location.href = "/";
+        return;
+      }
+      setDeleteError(data.error || "Couldn't delete the account.");
+    } catch {
+      setDeleteError("Couldn't reach the server. Nothing was deleted.");
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -406,6 +434,79 @@ export function ProfileForm({ family, members: initialMembers, preferences: init
           />
         </div>
       </Section>
+
+      {!isPreview && (
+        <Section icon={ShieldAlert} title="Your data">
+          <div className="space-y-5">
+            <div>
+              <p className="text-sm text-text-primary mb-1">Download a copy</p>
+              <p className="text-xs text-text-secondary mb-3 leading-relaxed">
+                Everything Kin holds for your household — your family, calendar, messages and
+                preferences — as a single JSON file.
+              </p>
+              <a
+                href="/api/account/export"
+                className="press inline-flex items-center gap-2 bg-surface-2 hover:bg-surface-3 border border-border text-text-primary text-sm font-medium rounded-lg px-3.5 py-2 transition-colors"
+              >
+                <Download size={14} />
+                Download my data
+              </a>
+            </div>
+
+            <div className="border-t border-border pt-5">
+              <p className="text-sm text-text-primary mb-1">Delete this household</p>
+              <p className="text-xs text-text-secondary mb-3 leading-relaxed">
+                Removes your account and everything in it — calendar, messages, family members —
+                for good. This can&apos;t be undone, so download a copy first if you want one.
+              </p>
+
+              {!showDelete ? (
+                <button
+                  onClick={() => setShowDelete(true)}
+                  className="press inline-flex items-center gap-2 border border-red-700/30 text-red-700 hover:bg-red-700/8 text-sm font-medium rounded-lg px-3.5 py-2 transition-colors"
+                >
+                  <Trash2 size={14} />
+                  Delete my household
+                </button>
+              ) : (
+                <div className="space-y-2.5">
+                  <label className="block text-xs text-text-secondary">
+                    Type <span className="text-text-primary font-medium">{familyName || "your household name"}</span> to confirm
+                  </label>
+                  <input
+                    type="text"
+                    value={confirmText}
+                    onChange={(e) => setConfirmText(e.target.value)}
+                    placeholder={familyName}
+                    autoFocus
+                    className="input-field"
+                  />
+                  {deleteError && (
+                    <p className="text-xs text-red-700 bg-red-700/8 border border-red-700/25 rounded-lg px-3 py-2">
+                      {deleteError}
+                    </p>
+                  )}
+                  <div className="flex gap-2">
+                    <button
+                      onClick={deleteAccount}
+                      disabled={deleting || confirmText.trim().toLowerCase() !== familyName.trim().toLowerCase()}
+                      className="press bg-red-700 hover:bg-red-800 text-bg text-sm font-semibold rounded-lg px-3.5 py-2 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      {deleting ? "Deleting…" : "Delete for good"}
+                    </button>
+                    <button
+                      onClick={() => { setShowDelete(false); setConfirmText(""); setDeleteError(""); }}
+                      className="px-3 text-sm text-text-muted hover:text-text-secondary bg-surface-2 rounded-lg"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </Section>
+      )}
     </div>
   );
 }

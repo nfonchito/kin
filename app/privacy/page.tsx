@@ -63,15 +63,17 @@ export default function PrivacyPage() {
 
       <h2>Data retention</h2>
       <p>
-        We keep your information for as long as your account is active. You can ask us to delete your
-        account and associated data at any time, and data held only in your browser can be cleared by
-        clearing your browser storage.
+        We keep your information for as long as your account is active. You can delete your account
+        and everything in it yourself, at any time, from your profile page — it removes your
+        household, calendar, messages and family members immediately and cannot be undone. Data held
+        only in your browser can be cleared by clearing your browser storage.
       </p>
 
       <h2>Your choices and rights</h2>
       <ul>
         <li>You can view and update your family details from your profile at any time.</li>
-        <li>You can request a copy of your data or ask us to delete it.</li>
+        <li>You can download a copy of everything we hold for your household from your profile page.</li>
+        <li>You can delete your account and all of its data yourself, from the same page.</li>
         <li>You can opt out of notification emails.</li>
       </ul>
 
