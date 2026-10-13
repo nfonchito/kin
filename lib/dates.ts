@@ -401,3 +401,64 @@ export function formatEventLine(
   const date = wall.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" });
   return `${date} · ${time}`;
 }
+
+/**
+ * Moves an occurrence by a number of calendar days and pins it to a local
+ * wall-clock time, in the given zone.
+ *
+ * Shifting a whole series by a fixed number of milliseconds looks right until
+ * the run crosses a daylight-saving change, at which point a 10:30 job quietly
+ * becomes 9:30. Stepping on the civil calendar and re-pinning the time is what
+ * keeps every occurrence at the hour the family actually chose.
+ *
+ * With no zone it falls back to UTC arithmetic, which is the old behaviour.
+ */
+export function shiftPreservingLocalTime(
+  iso: string,
+  dayDelta: number,
+  localHour: number,
+  localMinute: number,
+  timeZone?: string | null
+): string {
+  const ts = new Date(iso).getTime();
+
+  if (!timeZone) {
+    const d = new Date(ts);
+    d.setUTCDate(d.getUTCDate() + dayDelta);
+    d.setUTCHours(localHour, localMinute, 0, 0);
+    return d.toISOString();
+  }
+
+  const p = zonedParts(ts, timeZone);
+  // Normalising through Date.UTC lets the day roll over month and year ends.
+  const rolled = new Date(Date.UTC(p.year, p.month, p.day + dayDelta));
+  return new Date(
+    zonedToInstant(
+      rolled.getUTCFullYear(),
+      rolled.getUTCMonth(),
+      rolled.getUTCDate(),
+      localHour,
+      localMinute,
+      timeZone
+    )
+  ).toISOString();
+}
+
+/** The local wall-clock parts of an instant in a zone (UTC when none given). */
+export function localPartsIn(iso: string, timeZone?: string | null) {
+  const ts = new Date(iso).getTime();
+  if (!timeZone) {
+    const d = new Date(ts);
+    return { year: d.getUTCFullYear(), month: d.getUTCMonth(), day: d.getUTCDate(), hour: d.getUTCHours(), minute: d.getUTCMinutes() };
+  }
+  return zonedParts(ts, timeZone);
+}
+
+/** Whole days between two instants, counted on the local calendar. */
+export function localDayDelta(fromISO: string, toISO: string, timeZone?: string | null): number {
+  const a = localPartsIn(fromISO, timeZone);
+  const b = localPartsIn(toISO, timeZone);
+  return Math.round(
+    (Date.UTC(b.year, b.month, b.day) - Date.UTC(a.year, a.month, a.day)) / 86400000
+  );
+}

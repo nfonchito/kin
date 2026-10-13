@@ -78,6 +78,12 @@ CREATE TABLE IF NOT EXISTS events (
   category TEXT DEFAULT 'general',
   color TEXT DEFAULT '#15c489',
   created_by TEXT DEFAULT 'user',
+  -- A repeating request ("every Thursday") is still written as one row per
+  -- occurrence, but every row in the run shares a recurrence_id and carries
+  -- the phrase it came from, so a series can be edited or cancelled as a unit
+  -- and topped up before it runs out.
+  recurrence_id UUID,
+  recurrence_rule TEXT,
   activity_id UUID REFERENCES activities(id) ON DELETE SET NULL,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -127,6 +133,8 @@ CREATE POLICY "Users can manage their family events" ON events
   FOR ALL USING (
     family_id IN (SELECT id FROM families WHERE user_id = auth.uid())
   );
+
+CREATE INDEX IF NOT EXISTS idx_events_recurrence ON events (recurrence_id) WHERE recurrence_id IS NOT NULL;
 
 -- ─── Trigger: auto-create family on signup ────────────────────────────────────
 

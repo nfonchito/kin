@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { shiftPreservingLocalTime, localPartsIn, localDayDelta } from "@/lib/dates";
 import {
   format,
   startOfMonth,
@@ -22,6 +23,9 @@ interface CalEvent {
   start_time: string;
   category: string;
   color?: string;
+  /** Present when this is one occurrence of a repeating request. */
+  recurrence_id?: string | null;
+  recurrence_rule?: string | null;
 }
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -56,6 +60,9 @@ export function CalendarView({ events: initialEvents, familyId }: CalendarViewPr
   const [showForm, setShowForm] = useState(false);
   // Set while editing an existing row; null means the form is adding a new one.
   const [editingId, setEditingId] = useState<string | null>(null);
+  // The row currently asking "just this one, or the whole run?"
+  const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
+  const [editScope, setEditScope] = useState<"one" | "series">("one");
   const [newTitle, setNewTitle] = useState("");
   const [newDate, setNewDate] = useState("");
   const [newTime, setNewTime] = useState("09:00");
@@ -80,6 +87,8 @@ export function CalendarView({ events: initialEvents, familyId }: CalendarViewPr
   function closeForm() {
     setShowForm(false);
     setEditingId(null);
+    setEditScope("one");
+    setConfirmRemove(null);
   }
 
   function openAdd(day: Date) {
@@ -96,6 +105,8 @@ export function CalendarView({ events: initialEvents, familyId }: CalendarViewPr
   function openEdit(ev: CalEvent) {
     const at = new Date(ev.start_time);
     setEditingId(ev.id);
+    setEditScope("one");
+    setConfirmRemove(null);
     setNewTitle(ev.title);
     setNewDate(format(at, "yyyy-MM-dd"));
     setNewTime(format(at, "HH:mm"));
@@ -118,7 +129,22 @@ export function CalendarView({ events: initialEvents, familyId }: CalendarViewPr
 
     if (isPreview(familyId)) {
       setEvents((prev) => {
-        const updated = editingId
+        const edited = prev.find((e) => e.id === editingId);
+        const sid = edited?.recurrence_id;
+        const applyToRun = editingId && editScope === "series" && sid;
+        // Shift on the local calendar, matching the server. A millisecond delta
+        // would drop a 10:30 run to 9:30 once it crosses a clock change.
+        const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        const dayDelta = edited ? localDayDelta(edited.start_time, fields.start_time, zone) : 0;
+        const target = localPartsIn(fields.start_time, zone);
+        const updated = applyToRun
+          ? prev.map((ev) =>
+              ev.recurrence_id === sid && ev.start_time >= (edited?.start_time ?? "")
+                ? { ...ev, title: fields.title, category: fields.category, color: fields.color,
+                    start_time: shiftPreservingLocalTime(ev.start_time, dayDelta, target.hour, target.minute, zone) }
+                : ev
+            )
+          : editingId
           ? prev.map((ev) => (ev.id === editingId ? { ...ev, ...fields } : ev))
           : [...prev, { id: Date.now().toString(), ...fields }];
         localStorage.setItem(PREVIEW_KEY, JSON.stringify(updated));
@@ -128,7 +154,7 @@ export function CalendarView({ events: initialEvents, familyId }: CalendarViewPr
       const res = await fetch("/api/events", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: editingId, ...fields }),
+        body: JSON.stringify({ id: editingId, ...fields, ...(editScope === "series" ? { scope: "series" } : {}) }),
       });
       if (res.ok) {
         const data = await res.json();
@@ -154,10 +180,16 @@ export function CalendarView({ events: initialEvents, familyId }: CalendarViewPr
     setSaving(false);
   }
 
-  async function removeEvent(id: string) {
+  async function removeEvent(id: string, scope: "one" | "series" = "one") {
+    const target = events.find((e) => e.id === id);
+    const seriesId = target?.recurrence_id;
+
     if (isPreview(familyId)) {
       setEvents((prev) => {
-        const updated = prev.filter((e) => e.id !== id);
+        const updated =
+          scope === "series" && seriesId
+            ? prev.filter((e) => !(e.recurrence_id === seriesId && e.start_time >= (target?.start_time ?? "")))
+            : prev.filter((e) => e.id !== id);
         localStorage.setItem(PREVIEW_KEY, JSON.stringify(updated));
         return updated;
       });
@@ -165,10 +197,15 @@ export function CalendarView({ events: initialEvents, familyId }: CalendarViewPr
       await fetch("/api/events", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id }),
+        body: JSON.stringify({ id, ...(scope === "series" ? { scope: "series" } : {}) }),
       });
-      setEvents((prev) => prev.filter((e) => e.id !== id));
+      setEvents((prev) =>
+        scope === "series" && seriesId
+          ? prev.filter((e) => !(e.recurrence_id === seriesId && e.start_time >= (target?.start_time ?? "")))
+          : prev.filter((e) => e.id !== id)
+      );
     }
+    setConfirmRemove(null);
   }
 
   const selectedDayEvents = selected ? eventsOnDay(selected) : [];
@@ -319,6 +356,18 @@ export function CalendarView({ events: initialEvents, familyId }: CalendarViewPr
                   <option value="social">Social</option>
                 </select>
               </div>
+              {editingId && selectedDayEvents.find((e) => e.id === editingId)?.recurrence_id && (
+                <label className="flex items-center gap-2 text-xs text-text-secondary cursor-pointer py-0.5">
+                  <input
+                    type="checkbox"
+                    checked={editScope === "series"}
+                    onChange={(e) => setEditScope(e.target.checked ? "series" : "one")}
+                    className="accent-accent"
+                  />
+                  Apply to the whole run from here on
+                </label>
+              )}
+
               <div className="flex gap-2">
                 <button
                   type="submit"
@@ -355,6 +404,7 @@ export function CalendarView({ events: initialEvents, familyId }: CalendarViewPr
                     <p className="text-sm text-text-primary">{ev.title}</p>
                     <p className="text-xs text-text-muted">
                       {format(new Date(ev.start_time), "h:mm a")}
+                      {ev.recurrence_rule ? " · " + ev.recurrence_rule : ""}
                     </p>
                   </div>
                   <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-all">
@@ -364,12 +414,35 @@ export function CalendarView({ events: initialEvents, familyId }: CalendarViewPr
                     >
                       Edit
                     </button>
-                    <button
-                      onClick={() => removeEvent(ev.id)}
-                      className="text-xs text-text-muted hover:text-red-700 transition-colors"
-                    >
-                      Remove
-                    </button>
+                    {confirmRemove === ev.id ? (
+                      <>
+                        <button
+                          onClick={() => removeEvent(ev.id, "one")}
+                          className="text-xs text-red-700 hover:underline"
+                        >
+                          Just this one
+                        </button>
+                        <button
+                          onClick={() => removeEvent(ev.id, "series")}
+                          className="text-xs text-red-700 hover:underline"
+                        >
+                          All future
+                        </button>
+                        <button
+                          onClick={() => setConfirmRemove(null)}
+                          className="text-xs text-text-muted hover:text-text-secondary"
+                        >
+                          Cancel
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        onClick={() => (ev.recurrence_id ? setConfirmRemove(ev.id) : removeEvent(ev.id))}
+                        className="text-xs text-text-muted hover:text-red-700 transition-colors"
+                      >
+                        Remove
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}

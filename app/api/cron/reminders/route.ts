@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendReminderEmail, type ReminderEvent } from "@/lib/email";
 import { reminderWindow, LOOKAHEAD_HOURS } from "@/lib/reminders";
+import { topUpSeries } from "@/lib/series";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -34,6 +35,21 @@ export async function GET(req: NextRequest) {
   }
 
   const dryRun = req.nextUrl.searchParams.get("dry") === "1";
+
+  // Repeating events are materialised rows, so a run is finite. This is the
+  // one job that already runs daily, so it's where series get extended before
+  // they quietly stop. Never fatal — a failure here must not cost anyone
+  // their reminder.
+  let series = { extended: 0, added: 0 } as Awaited<ReturnType<typeof topUpSeries>>;
+  if (!dryRun) {
+    try {
+      series = await topUpSeries(admin);
+      if (series.error) console.warn("[cron/reminders] series top-up skipped:", series.error);
+    } catch (e) {
+      console.error("[cron/reminders] series top-up threw:", e);
+    }
+  }
+
   const { now, until } = reminderWindow();
 
   const { data: events, error: eventsError } = await admin
@@ -132,6 +148,8 @@ export async function GET(req: NextRequest) {
     families: byFamily.size,
     optedOut: optedOutCount,
     sent,
+    seriesExtended: series.extended,
+    occurrencesAdded: series.added,
     ...(skipped.length ? { skipped } : {}),
   });
 }

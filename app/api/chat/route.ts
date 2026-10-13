@@ -76,6 +76,10 @@ interface CalEvent {
   category: string;
   color: string;
   description?: string;
+  /** The cadence this came from ("every Thursday"), set only on a series. */
+  recurrence_rule?: string;
+  /** Shared by every occurrence of one request, so the run can be acted on. */
+  recurrence_id?: string;
 }
 
 function extractEventTitle(msg: string): string {
@@ -147,12 +151,17 @@ function buildEventSeries(
       .trim() || first.title;
 
   const stamp = Date.now();
+  // Minted here so the rows the client sees and the rows written to the
+  // database carry the same id.
+  const recurrenceId = crypto.randomUUID();
   return expandOccurrences(first.start_time, recurrence, tzOffsetMin, timeZone).map((start_time, i) => ({
     ...first,
     id: `${stamp}-${i}`,
     title,
     start_time,
     description: `Repeats ${recurrence}`,
+    recurrence_rule: recurrence,
+    recurrence_id: recurrenceId,
   }));
 }
 
@@ -776,16 +785,33 @@ export async function POST(req: NextRequest) {
   // only ever claims what actually persisted.
   let savedEvents: CalEvent[] = [];
   if (series.length > 0) {
-    const { error: eventError } = await supabase.from("events").insert(
-      series.map((e) => ({
-        family_id: familyId,
-        title: e.title,
-        start_time: e.start_time,
-        category: e.category,
-        color: e.color,
-        ...(e.description ? { description: e.description } : {}),
-      }))
-    );
+    const base = series.map((e) => ({
+      family_id: familyId,
+      title: e.title,
+      start_time: e.start_time,
+      category: e.category,
+      color: e.color,
+      ...(e.description ? { description: e.description } : {}),
+    }));
+
+    // Every occurrence of one request shares an id, so the run can later be
+    // edited or cancelled as a unit instead of twelve times.
+    const rule = series[0]?.recurrence_rule;
+    const recurrenceId = series[0]?.recurrence_id ?? null;
+    const withRecurrence =
+      rule && recurrenceId
+        ? base.map((row) => ({ ...row, recurrence_id: recurrenceId, recurrence_rule: rule }))
+        : base;
+
+    let { error: eventError } = await supabase.from("events").insert(withRecurrence);
+
+    // 42703 = the recurrence columns aren't in the database yet. Fall back to
+    // the plain insert so a pending migration can't stop events being created.
+    if (eventError?.code === "42703" && rule) {
+      console.warn("[chat] recurrence columns missing — run the schema migration");
+      ({ error: eventError } = await supabase.from("events").insert(base));
+    }
+
     if (eventError) console.error("[chat] calendar event insert failed:", eventError.message, eventError);
     else savedEvents = series;
   }
