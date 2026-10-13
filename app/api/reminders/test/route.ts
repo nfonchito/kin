@@ -29,7 +29,7 @@ async function loadContext() {
 
   const { data: family } = await supabase
     .from("families")
-    .select("id, name")
+    .select("id, name, timezone")
     .eq("user_id", user.id)
     .single();
 
@@ -52,6 +52,9 @@ export async function GET() {
     wouldSendTo: user.email,
     eventCount: events.length,
     events: events.map((e) => ({ title: e.title, start_time: e.start_time })),
+    // Which zone the email will render times in — the main thing to check
+    // when the times in a reminder look wrong.
+    timeZone: family.timezone ?? `${process.env.KIN_DEFAULT_TZ || "America/Chicago"} (fallback — none stored)`,
     scheduledJob: cronReadiness(),
   });
 }
@@ -75,7 +78,12 @@ export async function POST() {
     });
   }
 
-  const result = await sendReminderEmail({ to: user.email, familyName: family.name, events });
+  const result = await sendReminderEmail({
+    to: user.email,
+    familyName: family.name,
+    events,
+    timeZone: family.timezone,
+  });
   if (!result.ok) return NextResponse.json({ ok: false, error: result.error }, { status: 502 });
 
   return NextResponse.json({ ok: true, sentTo: user.email, eventCount: events.length });

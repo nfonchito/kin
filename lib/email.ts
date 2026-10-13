@@ -71,14 +71,26 @@ export interface ReminderEvent {
   category?: string | null;
 }
 
-// Families are Austin-based today and we don't store a per-family timezone
-// yet, so reminder times are rendered in Central.
-const REMINDER_TZ = process.env.KIN_DEFAULT_TZ || "America/Chicago";
+// Used only when a family has no timezone stored yet.
+const FALLBACK_TZ = process.env.KIN_DEFAULT_TZ || "America/Chicago";
 
-function formatEventTime(iso: string): string {
+// A zone name reaches Intl, which throws on anything it doesn't recognise —
+// and a throw here would take down the whole send.
+export function safeZone(timeZone?: string | null): string {
+  if (!timeZone) return FALLBACK_TZ;
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone }).format();
+    return timeZone;
+  } catch {
+    console.warn(`[email] unknown timezone ${timeZone}, falling back to ${FALLBACK_TZ}`);
+    return FALLBACK_TZ;
+  }
+}
+
+export function formatEventTime(iso: string, timeZone: string): string {
   const d = new Date(iso);
-  const day = d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: REMINDER_TZ });
-  const time = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: REMINDER_TZ });
+  const day = d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone });
+  const time = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone });
   return `${day} · ${time}`;
 }
 
@@ -87,8 +99,11 @@ export async function sendReminderEmail(opts: {
   to: string;
   familyName?: string | null;
   events: ReminderEvent[];
+  /** The family's IANA zone. Without it, times render in the fallback zone. */
+  timeZone?: string | null;
 }): Promise<SendResult> {
   const { to, familyName, events } = opts;
+  const zone = safeZone(opts.timeZone);
   if (events.length === 0) return { ok: false, error: "No events to remind about" };
 
   const heading = events.length === 1 ? "1 thing coming up" : `${events.length} things coming up`;
@@ -101,7 +116,7 @@ export async function sendReminderEmail(opts: {
             ${escapeHtml(e.title)}
           </td>
           <td style="padding: 12px 16px; border-bottom: 1px solid #eee; font-size: 14px; color: #555; white-space: nowrap; text-align: right;">
-            ${escapeHtml(formatEventTime(e.start_time))}
+            ${escapeHtml(formatEventTime(e.start_time, zone))}
           </td>
         </tr>`
     )
@@ -131,6 +146,7 @@ export async function sendReminderEmail(opts: {
 
       <p style="margin: 28px 0 0; font-size: 12px; color: #aaa;">
         You're getting this because these are on your Kin calendar.
+        Times shown in ${escapeHtml(zone.replace(/_/g, " "))}.
       </p>
     </div>
   `;

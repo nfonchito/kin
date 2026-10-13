@@ -14,6 +14,10 @@ CREATE TABLE IF NOT EXISTS families (
   city TEXT,
   state TEXT,
   zip TEXT,
+  -- IANA zone name, e.g. 'America/Chicago'. Captured from the browser at
+  -- signup and refreshed opportunistically from chat. Reminder emails render
+  -- in this zone; NULL falls back to KIN_DEFAULT_TZ.
+  timezone TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );

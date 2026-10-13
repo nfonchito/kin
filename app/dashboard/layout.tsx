@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
+import { TimezoneSync } from "@/components/TimezoneSync";
 import { Sidebar } from "@/components/Sidebar";
 import { MobileNav } from "@/components/MobileNav";
 
@@ -54,6 +55,7 @@ export default async function DashboardLayout({
 
   return (
     <div className="flex h-screen bg-bg overflow-hidden">
+      <TimezoneSync hasTimezone={!!family?.timezone} />
       <Sidebar family={family} userEmail={userEmail} />
       <main className="flex-1 overflow-auto lg:ml-0">
         <MobileNav family={family} userEmail={userEmail} />

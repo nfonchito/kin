@@ -64,7 +64,7 @@ export async function GET(req: NextRequest) {
 
   const [{ data: families, error: familiesError }, { data: prefs, error: prefsError }] =
     await Promise.all([
-      admin.from("families").select("id, user_id, name").in("id", familyIds),
+      admin.from("families").select("id, user_id, name, timezone").in("id", familyIds),
       // The Profile toggle writes reminders_enabled; honour it here or the
       // switch is decorative and we email people who opted out.
       admin.from("family_preferences").select("family_id, reminders_enabled").in("family_id", familyIds),
@@ -110,7 +110,12 @@ export async function GET(req: NextRequest) {
       continue;
     }
 
-    const result = await sendReminderEmail({ to: email, familyName: family.name, events: familyEvents });
+    const result = await sendReminderEmail({
+      to: email,
+      familyName: family.name,
+      events: familyEvents,
+      timeZone: family.timezone,
+    });
     if (result.ok) sent++;
     else skipped.push(`${family.id}: ${result.error}`);
   }

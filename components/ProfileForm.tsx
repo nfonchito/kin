@@ -7,6 +7,7 @@ interface Family {
   id: string;
   name: string;
   neighborhood?: string;
+  timezone?: string | null;
   city?: string;
   state?: string;
   zip?: string;
@@ -78,6 +79,8 @@ export function ProfileForm({ family, members: initialMembers, preferences: init
   const [savingFamily, setSavingFamily] = useState(false);
   const [savingPrefs, setSavingPrefs] = useState(false);
   const [saved, setSaved] = useState<string | null>(null);
+  const [timezone, setTimezone] = useState(family?.timezone ?? "");
+  const [savingZone, setSavingZone] = useState(false);
   const [confirmText, setConfirmText] = useState("");
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState("");
@@ -101,6 +104,19 @@ export function ProfileForm({ family, members: initialMembers, preferences: init
     } finally {
       setTestingReminder(false);
     }
+  }
+
+  async function useDeviceTimezone() {
+    const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (!zone) return;
+    setSavingZone(true);
+    const res = await fetch("/api/profile", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type: "timezone", timezone: zone }),
+    });
+    if (res.ok) setTimezone(zone);
+    setSavingZone(false);
   }
 
   async function deleteAccount() {
@@ -424,6 +440,24 @@ export function ProfileForm({ family, members: initialMembers, preferences: init
                   {reminderResult.message}
                 </p>
               )}
+            </div>
+          )}
+
+          {!isPreview && (
+            <div className="border-t border-border pt-4">
+              <p className="text-sm text-text-primary">Reminder times</p>
+              <p className="text-xs text-text-muted mt-0.5 mb-2.5">
+                {timezone
+                  ? `Shown in ${timezone.replace(/_/g, " ")}.`
+                  : "No timezone set yet — reminder times are shown in US Central."}
+              </p>
+              <button
+                onClick={useDeviceTimezone}
+                disabled={savingZone}
+                className="press text-xs text-accent hover:text-accent-dim transition-colors disabled:opacity-50"
+              >
+                {savingZone ? "Saving…" : "Use this device's timezone"}
+              </button>
             </div>
           )}
 
