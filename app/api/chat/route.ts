@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { sendTaskNotification } from "@/lib/email";
 import { generateSmartReply } from "@/lib/ai";
 import { rateLimit } from "@/lib/ratelimit";
+import { formatCalendarAnswer } from "@/lib/calendar-answer";
 import {
   TOMORROW_RE,
   TODAY_RE,
@@ -14,6 +15,8 @@ import {
   whenPhrase,
   formatUserNow,
   expandOccurrences,
+  calendarWindow,
+  formatEventLine,
 } from "@/lib/dates";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -264,10 +267,16 @@ function detectIntent(msg: string, history: Message[], tzOffsetMin = 0): string 
   if (/^(yes|yep|yeah|yup|ya|sure|ok|okay|k|sounds good|sounds great|go ahead|do it|please do|yes please|perfect|great|that works|works for me)[\s!.]*$/.test(lower))
     return "affirmation";
 
-  // Calendar query — before add_to_calendar so "what do I have Friday" isn't a new event
+  // Calendar query — before add_to_calendar so "what do I have Friday" isn't a
+  // new event. Deliberately wide: a real user typed "Show me the calendar" and
+  // matched none of this, and "what's on Friday" — the most obvious question
+  // you can ask an assistant that owns your calendar — fell through too.
   if (/\bmy (schedule|calendar|agenda)\b/.test(lower) ||
       /\bwhat do i have\b/.test(lower) ||
-      /(what('?s| is)|anything)\b[^?]*\b(on (my|the) (calendar|schedule)|going on|happening|planned|scheduled|coming up)\b/.test(lower))
+      (/\b(calendar|schedule|agenda)\b/.test(lower) &&
+       /\b(show|see|view|open|check|list|pull up|read|what'?s|what is)\b/.test(lower)) ||
+      /\b(what'?s|what is|anything)\b[^?]*\b(going on|happening|planned|scheduled|coming up|on tap|booked)\b/.test(lower) ||
+      /\b(what'?s|what is|what have i got|anything)\b[^?]*\b(today|tonight|tomorrow|this week|next week|this month|weekend|sunday|monday|tuesday|wednesday|thursday|friday|saturday)\b/.test(lower))
     return "calendar_query";
 
   // Cancel / reschedule — before task matching so "cancel the dentist" isn't a new appointment
@@ -697,6 +706,29 @@ export async function POST(req: NextRequest) {
 
   // Generate response
   const intent = detectIntent(message, history, tz);
+
+  // Calendar questions get answered from the real rows. This used to deflect
+  // to "your schedule lives on the Calendar tab", which is the moment the
+  // product stops looking like an assistant.
+  let calendarReply: string | null = null;
+  if (intent === "calendar_query") {
+    const win = calendarWindow(message, tz);
+    const { data: windowEvents, error: windowError } = await supabase
+      .from("events")
+      .select("title, start_time, category")
+      .eq("family_id", familyId)
+      .gte("start_time", win.startISO)
+      .lte("start_time", win.endISO)
+      .order("start_time", { ascending: true })
+      .limit(50);
+    if (windowError) {
+      console.error("[chat] calendar query failed:", windowError.message);
+      calendarReply = "I couldn't reach your calendar just then — the Calendar tab will have it. Try me again in a moment?";
+    } else {
+      calendarReply = formatCalendarAnswer(windowEvents ?? [], win, tz);
+    }
+  }
+
   const { reply, activity } = generateResponse(intent, message, ctx, tz);
   const series = activity ? buildEventSeries(activity, message, tz, zone) : [];
 
@@ -721,11 +753,15 @@ export async function POST(req: NextRequest) {
   const savedEvent = savedEvents[0] ?? null;
 
   // Use Claude for the reply when an API key is configured; otherwise fall back.
-  const smart = await generateSmartReply(message, ctx, history, {
-    calendarEvent: savedEvent ? { title: savedEvent.title, start_time: savedEvent.start_time } : null,
-    activity: activity ?? null,
-  });
-  const finalReply = smart ?? (reply + calendarNote(savedEvents.length));
+  // A calendar answer is read straight from the rows, so it skips the model
+  // entirely — no paid call, and nothing that could reword real data.
+  const smart = calendarReply
+    ? null
+    : await generateSmartReply(message, ctx, history, {
+        calendarEvent: savedEvent ? { title: savedEvent.title, start_time: savedEvent.start_time } : null,
+        activity: activity ?? null,
+      });
+  const finalReply = calendarReply ?? smart ?? (reply + calendarNote(savedEvents.length));
 
   // Save assistant message
   const { data: assistantMsg } = await supabase

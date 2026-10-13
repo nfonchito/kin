@@ -301,3 +301,103 @@ export function formatUserNow(tzOffsetMin = 0): { date: string; time: string } {
     time: wall.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "UTC" }),
   };
 }
+
+// ─── Calendar queries ─────────────────────────────────────────────────────────
+
+export interface CalendarWindow {
+  /** Real instants, for querying start_time. */
+  startISO: string;
+  endISO: string;
+  /** How to name the span in a reply ("today", "Friday", "the next 7 days"). */
+  label: string;
+  /** True when the span is a single calendar day — the reply can then omit
+   *  the date from every row and just list times. */
+  singleDay: boolean;
+}
+
+/**
+ * The span of time a calendar question is asking about. Always returns a
+ * window; an unqualified question ("what's on my calendar?") means the week
+ * ahead. Day boundaries are the user's local midnight, not UTC.
+ */
+export function calendarWindow(msg: string, tzOffsetMin = 0): CalendarWindow {
+  const lower = normalizeDays(msg.toLowerCase());
+  const now = shiftedNow(tzOffsetMin);
+
+  const dayStart = (d: Date) => { const x = new Date(d); x.setUTCHours(0, 0, 0, 0); return x; };
+  const dayEnd = (d: Date) => { const x = new Date(d); x.setUTCHours(23, 59, 59, 999); return x; };
+  const plusDays = (d: Date, n: number) => { const x = new Date(d); x.setUTCDate(x.getUTCDate() + n); return x; };
+  const span = (a: Date, b: Date, label: string, singleDay = false): CalendarWindow => ({
+    startISO: unshift(a, tzOffsetMin),
+    endISO: unshift(b, tzOffsetMin),
+    label,
+    singleDay,
+  });
+
+  if (TODAY_RE.test(lower)) return span(dayStart(now), dayEnd(now), "today", true);
+  if (TOMORROW_RE.test(lower)) {
+    const d = plusDays(now, 1);
+    return span(dayStart(d), dayEnd(d), "tomorrow", true);
+  }
+
+  // Saturday + Sunday of the coming weekend (today included if it's already one).
+  if (/\bweekend\b/.test(lower)) {
+    const dow = now.getUTCDay();
+    const toSat = dow === 6 ? 0 : dow === 0 ? -1 : 6 - dow;
+    const sat = plusDays(now, toSat);
+    return span(dayStart(sat), dayEnd(plusDays(sat, 1)), "this weekend");
+  }
+
+  // Next week runs Monday→Sunday.
+  if (/\bnext week\b/.test(lower)) {
+    const toMon = ((8 - now.getUTCDay()) % 7) || 7;
+    const mon = plusDays(now, toMon);
+    return span(dayStart(mon), dayEnd(plusDays(mon, 6)), "next week");
+  }
+
+  // This week means the rest of it — through Sunday night.
+  if (/\bthis week\b|\brest of (the )?week\b/.test(lower)) {
+    const toSun = (7 - now.getUTCDay()) % 7;
+    return span(now, dayEnd(plusDays(now, toSun)), "the rest of this week");
+  }
+
+  if (/\bnext month\b/.test(lower)) {
+    const first = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+    const last = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 2, 0));
+    return span(dayStart(first), dayEnd(last), "next month");
+  }
+  if (/\bthis month\b|\brest of (the )?month\b/.test(lower)) {
+    const last = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0));
+    return span(now, dayEnd(last), "the rest of this month");
+  }
+
+  // A named weekday. Unlike event creation, a bare "Friday" asked ON Friday
+  // means today — you're asking about the day you're in, not a week out.
+  const days = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+  const wd = lower.match(/\b(next\s+)?(sunday|monday|tuesday|wednesday|thursday|friday|saturday)\b/);
+  if (wd) {
+    const target = days.indexOf(wd[2]);
+    let ahead = target - now.getUTCDay();
+    if (ahead < 0) ahead += 7;
+    if (wd[1] && ahead === 0) ahead = 7;      // "next Friday" said on Friday
+    else if (wd[1] && ahead < 7) ahead += 7;  // "next Friday" said midweek
+    const d = plusDays(now, ahead);
+    const name = d.toLocaleDateString("en-US", { weekday: "long", timeZone: "UTC" });
+    return span(dayStart(d), dayEnd(d), ahead === 0 ? `today` : `${wd[1] ? "next " : ""}${name}`, true);
+  }
+
+  return span(now, dayEnd(plusDays(now, 6)), "the next 7 days");
+}
+
+/** A calendar row rendered in the user's own local time. */
+export function formatEventLine(
+  startISO: string,
+  tzOffsetMin = 0,
+  opts: { withDate?: boolean } = {}
+): string {
+  const wall = new Date(new Date(startISO).getTime() - tzOffsetMin * MS_MIN);
+  const time = wall.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "UTC" });
+  if (!opts.withDate) return time;
+  const date = wall.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" });
+  return `${date} · ${time}`;
+}
