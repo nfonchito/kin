@@ -1,0 +1,20 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      # The project pins a React release candidate against @types/react 18,
+      # which npm refuses without this flag.
+      - run: npm install --legacy-peer-deps
+      - run: npm run typecheck
+      - run: npm test

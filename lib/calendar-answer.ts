@@ -1,4 +1,4 @@
-import { formatEventLine } from "./dates";
+import { formatEventLine } from "./dates.ts";
 
 export interface StoredEvent {
   title: string;

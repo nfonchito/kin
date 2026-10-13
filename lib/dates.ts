@@ -86,6 +86,12 @@ export function extractDateISO(msg: string, tzOffsetMin = 0): string | null {
       d.setTime(now.getTime());
       d.setUTCMinutes(0, 0, 0);
       d.setUTCHours(d.getUTCHours() + 1);
+      // Late enough and the next hour is past midnight — which would file
+      // something said "today" under tomorrow's date. Keep it on today.
+      if (d.getUTCDate() !== now.getUTCDate()) {
+        d.setTime(now.getTime());
+        d.setUTCHours(23, 59, 0, 0);
+      }
     }
     return unshift(d, tzOffsetMin);
   }
