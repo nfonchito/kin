@@ -64,7 +64,9 @@ export async function GET(req: NextRequest) {
 
   const [{ data: families, error: familiesError }, { data: prefs, error: prefsError }] =
     await Promise.all([
-      admin.from("families").select("id, user_id, name, timezone").in("id", familyIds),
+      // "*" rather than naming timezone: until the column migration is run,
+      // naming it fails the query outright and nobody gets a reminder.
+      admin.from("families").select("*").in("id", familyIds),
       // The Profile toggle writes reminders_enabled; honour it here or the
       // switch is decorative and we email people who opted out.
       admin.from("family_preferences").select("family_id, reminders_enabled").in("family_id", familyIds),

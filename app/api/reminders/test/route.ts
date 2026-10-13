@@ -29,7 +29,7 @@ async function loadContext() {
 
   const { data: family } = await supabase
     .from("families")
-    .select("id, name, timezone")
+    .select("*")
     .eq("user_id", user.id)
     .single();
 

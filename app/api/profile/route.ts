@@ -40,7 +40,18 @@ export async function PATCH(req: NextRequest) {
     // "onlyIfMissing" is the automatic capture — it must never overwrite a
     // zone the family set deliberately, or a trip abroad would rewrite it.
     const { error } = data.onlyIfMissing ? await update.is("timezone", null) : await update;
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) {
+      // 42703 = the column isn't there yet; the migration in supabase/schema.sql
+      // hasn't been run. Say so plainly instead of a bare Postgres error.
+      if (error.code === "42703") {
+        console.warn("[profile] families.timezone is missing — run the schema migration");
+        return NextResponse.json(
+          { error: "Timezone storage isn't set up yet on this deployment." },
+          { status: 503 }
+        );
+      }
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
     return NextResponse.json({ success: true, timezone: zone });
   }
 
