@@ -241,7 +241,7 @@ export function ProfileForm({ family, members: initialMembers, preferences: init
               value={familyName}
               onChange={(e) => setFamilyName(e.target.value)}
               className="input-field"
-              placeholder="The Johnsons"
+              placeholder="Your household name"
             />
           </div>
           <div>
@@ -251,7 +251,7 @@ export function ProfileForm({ family, members: initialMembers, preferences: init
               value={neighborhood}
               onChange={(e) => setNeighborhood(e.target.value)}
               className="input-field"
-              placeholder="Northwest Hills"
+              placeholder="Your neighborhood"
             />
           </div>
           {userEmail && (

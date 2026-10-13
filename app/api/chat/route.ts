@@ -263,9 +263,30 @@ function detectIntent(msg: string, history: Message[], tzOffsetMin = 0): string 
   if (/how are you|how('?s| is) it going|you doing|how have you been/.test(lower))
     return "how_are_you";
 
-  // Short, standalone affirmations
-  if (/^(yes|yep|yeah|yup|ya|sure|ok|okay|k|sounds good|sounds great|go ahead|do it|please do|yes please|perfect|great|that works|works for me)[\s!.]*$/.test(lower))
+  // Closing or declining. Must come before anything that could read a refusal
+  // as a request: "no thanks" became a task called "no thanks", and emailed
+  // the user about it.
+  // The trailing "thanks" is the common case — "all good thanks", "that's all
+  // thanks" — so it's optional rather than a separate branch.
+  const CLOSER = `(no|nope|nah|nothing( else)?|that'?s (all|it)|all (done|good|set)|i'?m (done|good|all set)|we'?re (good|done)|never ?mind|nevermind|bye|goodbye|cheers)`;
+  const THANKS = `([\\s,]*(thanks?|thank you|cheers))?`;
+  if (new RegExp(`^${CLOSER}${THANKS}[\\s!.]*$`).test(lower) ||
+      new RegExp(`^(no|nope|nah)[,\\s]+${CLOSER}${THANKS}[\\s!.]*$`).test(lower) ||
+      /^no[,\s]+thanks?( you)?[\s!.]*$/.test(lower))
+    return "closing";
+
+  // Affirmations — bare, or with the words people actually add. A real user
+  // typed "Yes move forward create" and it fell through to the task fallback.
+  if (/^(yes|yep|yeah|yup|ya|sure|ok|okay|k|sounds good|sounds great|go ahead|do it|please do|yes please|perfect|great|that works|works for me)[\s!.]*$/.test(lower) ||
+      /^(yes|yeah|yep|yup|sure|ok|okay)\b[\s,]*(please|go ahead|do it|move forward|create( it)?|add it|make it|that'?s right|correct|sounds good|thanks?)/.test(lower) ||
+      /^(go ahead|please do|do it|move forward)\b/.test(lower))
     return "affirmation";
+
+  // "how does this work" / "what can you do" / "help". A new account asking
+  // what the thing is must not be answered with "I'll take care of that".
+  if (/^(help|help me|\?+)[\s!.]*$/.test(lower) ||
+      /how (does|do) (this|it|kin) work|what can (you|kin) do|how do i use|what do you do|how to use/.test(lower))
+    return "what_is_kin";
 
   // Calendar query — before add_to_calendar so "what do I have Friday" isn't a
   // new event. Deliberately wide: a real user typed "Show me the calendar" and
@@ -532,7 +553,7 @@ function generateResponse(
 
     case "affirmation":
       return { reply: pick([
-        "Perfect — consider it handled. Anything else?",
+        "Great — that's noted. Anything else?",
         "Great, I'm on it. What else can I take off your plate?",
         "Done. Let me know if there's anything else.",
       ]) };
@@ -555,15 +576,33 @@ function generateResponse(
         ? `I can't move events myself yet. On the Calendar tab you can remove it and add it back for ${when} — or tell me the details and I'll create the new one.`
         : "I can't move events myself yet — remove it on the Calendar tab, then tell me the new day and time and I'll add it." };
 
-    default:
+    case "closing":
+      return { reply: pick([
+        "Sounds good — I'm here whenever you need me.",
+        "Got it. I'll be here when something comes up.",
+        "Anytime. Just say the word when you need something added.",
+      ]) };
+
+    default: {
+      // Anything short or question-shaped that reaches here wasn't understood.
+      // Naming a task after the message is how a real user ended up with
+      // "No all done" and "Show me the calendar" on her to-do list, each one
+      // emailing her. Ask instead, and record nothing.
+      const words = msg.trim().split(/\s+/).length;
+      if (words <= 4 || /\?\s*$/.test(msg.trim())) {
+        return { reply: pick([
+          `I'm not sure what to do with that one. Tell me what you need the way you'd text it — "dentist Friday at 2" — and I'll put it on your calendar.`,
+          `I didn't quite follow that. Try it like "lawn care every Thursday" or "remind me to renew the car tax Friday".`,
+        ]) };
+      }
       return {
         reply: pick([
-          `Got it. I'll look into that for ${familyPhrase === "your family" ? "you" : `the ${familyPhrase}`} and follow up. Any deadline or details I should keep in mind?`,
-          `On it. Anything specific about timing or preferences that would help me handle this better?`,
-          `Noted — I'll take care of that. Any details before I move forward?`,
+          "I've written that down, though I'm not certain I understood it. If it belongs on the calendar, give me a day and I'll add it.",
+          "Noted — though I'm not sure I caught the details. If there's a date attached, tell me and I'll schedule it.",
         ]),
         activity: { title: msg.slice(0, 60), category: "general", status: "pending" },
       };
+    }
   }
 }
 
@@ -614,8 +653,9 @@ export async function POST(req: NextRequest) {
     const provided = context && typeof context === "object" ? context : {};
     const ctx: FamilyContext = {
       name: provided.name || "your family",
-      neighborhood: provided.neighborhood || "your neighborhood",
-      city: "Austin", state: "TX", zip: "",
+      neighborhood: provided.neighborhood || "",
+      // Blank, not Austin — the demo shouldn't tell a stranger where they live.
+      city: "", state: "", zip: "",
       members: Array.isArray(provided.members) ? provided.members : [],
       preferences: null,
     };

@@ -119,7 +119,7 @@ export default function SignupPage() {
               type="text"
               value={familyName}
               onChange={(e) => setFamilyName(e.target.value)}
-              placeholder="The Johnsons"
+              placeholder="Your household name"
               required
               className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-text-primary placeholder:text-text-muted text-sm focus:outline-none focus:border-accent transition-colors"
             />

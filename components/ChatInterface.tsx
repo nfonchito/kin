@@ -29,7 +29,7 @@ const GENERIC_SUGGESTIONS = [
   "Lawn care every Thursday",
   "Dentist appointment next Tuesday at 2pm",
   "Remind me to renew the car registration Friday",
-  "Bin day every Monday morning",
+  "Trash day every Monday morning",
 ];
 
 function buildSuggestions(memberNames: string[]): string[] {
@@ -41,7 +41,7 @@ function buildSuggestions(memberNames: string[]): string[] {
     `Dentist for ${first} next Tuesday at 2pm`,
     second ? `Remind ${second} about the school run Thursday` : "Lawn care every Thursday",
     "Remind me to renew the car registration Friday",
-    "Bin day every Monday morning",
+    "Trash day every Monday morning",
   ];
 }
 
@@ -330,7 +330,7 @@ export function ChatInterface({ familyId, initialMessages, memberNames = [] }: C
         </div>
 
         <p className="text-center text-[10px] text-text-muted mt-2">
-          Kin handles the details — you stay present
+          Kin keeps track — the calls are still yours
         </p>
       </div>
     </div>
