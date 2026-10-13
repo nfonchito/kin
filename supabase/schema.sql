@@ -134,7 +134,40 @@ CREATE POLICY "Users can manage their family events" ON events
     family_id IN (SELECT id FROM families WHERE user_id = auth.uid())
   );
 
+-- ─── Indexes ──────────────────────────────────────────────────────────────────
+--
+-- Only the primary keys and the family_preferences UNIQUE were indexed, so
+-- every one of these was a sequential scan.
+--
+-- The most valuable one is families(user_id): five tables carry an RLS policy
+-- of the form "family_id IN (SELECT id FROM families WHERE user_id = auth.uid())",
+-- so that lookup runs on every read and write in the app, not just on the
+-- fourteen places that filter on user_id directly.
+
+CREATE INDEX IF NOT EXISTS idx_families_user ON families (user_id);
+
+-- Dashboard, calendar and the chat's calendar answers: filter by family,
+-- bounded by a date range, ordered by date.
+CREATE INDEX IF NOT EXISTS idx_events_family_start ON events (family_id, start_time);
+
+-- The reminder cron sweeps every family at once, so it has no family_id to
+-- narrow on — this is the one that degrades first as signups grow.
+CREATE INDEX IF NOT EXISTS idx_events_start ON events (start_time);
+
+-- Acting on a repeating run as a unit. Partial: one-off events are the norm.
 CREATE INDEX IF NOT EXISTS idx_events_recurrence ON events (recurrence_id) WHERE recurrence_id IS NOT NULL;
+
+-- Chat history and the activity feed, both newest-first within a family.
+CREATE INDEX IF NOT EXISTS idx_messages_family_created ON messages (family_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_activities_family_created ON activities (family_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_family_members_family ON family_members (family_id, created_at);
+
+-- Postgres does not index foreign keys automatically, and deleting an activity
+-- does ON DELETE SET NULL across events. Partial: almost every event is null here.
+CREATE INDEX IF NOT EXISTS idx_events_activity ON events (activity_id) WHERE activity_id IS NOT NULL;
+
+-- family_preferences.family_id is already UNIQUE, which indexes it.
 
 -- ─── Trigger: auto-create family on signup ────────────────────────────────────
 
