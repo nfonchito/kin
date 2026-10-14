@@ -378,8 +378,32 @@ function generateResponse(
       ]) };
 
     case "what_is_kin": {
-      const knows = ctx.name === "your family" ? "your family" : `the ${ctx.name}`;
-      return { reply: `I'm Kin — somewhere to put everything the house needs so you're not holding it in your head. Tell me in plain English and I'll get it on your calendar, keep a list, and email you each morning with what's ahead.${ctx.neighborhood ? ` I know ${knows} and your home in ${ctx.neighborhood}, so you don't have to re-explain things.` : ""} I don't book services or make calls — that part's still yours.` };
+      const base = `I'm Kin — somewhere to put everything the house needs so you're not holding it in your head. Tell me in plain English and I'll get it on your calendar, keep a list, and email you each morning with what's ahead.`;
+      const tail = ` I don't book services or make calls — that part's still yours.`;
+
+      // Only claim to know the household once it has actually told us
+      // something. A brand-new account knows nothing, and saying otherwise was
+      // the first thing a new user could catch us out on.
+      const knowsName = !looksLikeAFamilyName && ctx.name !== "your family";
+      const knowsThem = knowsName || ctx.members.length > 0 || !!ctx.neighborhood;
+
+      if (!knowsThem) {
+        return { reply: `${base} I don't know anything about your household yet — add who's in it on the Profile page and I can keep track of who things are for.${tail}` };
+      }
+
+      const bits: string[] = [];
+      // "The Batlles" already carries its article — "the The Batlles" otherwise.
+      if (knowsName) bits.push(/^the\s/i.test(ctx.name.trim()) ? ctx.name.trim() : `the ${ctx.name.trim()}`);
+      if (ctx.members.length > 0) {
+        bits.push(ctx.members.length === 1 ? ctx.members[0].name : `${ctx.members.length} people in your household`);
+      }
+      if (ctx.neighborhood) bits.push(`your home in ${ctx.neighborhood}`);
+
+      // "a and b and c" reads like a child's list; join all but the last with commas.
+      const known =
+        bits.length > 1 ? `${bits.slice(0, -1).join(", ")} and ${bits[bits.length - 1]}` : bits[0];
+
+      return { reply: `${base} I know ${known}, so you don't have to re-explain things.${tail}` };
     }
 
     case "where_live": {

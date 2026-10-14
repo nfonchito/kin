@@ -4,6 +4,7 @@ import { ActivityFeed } from "@/components/ActivityFeed";
 import { UpcomingEvents } from "@/components/UpcomingEvents";
 import { PreviewGreeting } from "@/components/PreviewGreeting";
 import { TodayLabel } from "@/components/TodayLabel";
+import { SetupChecklist } from "@/components/SetupChecklist";
 
 const IS_PREVIEW = !process.env.NEXT_PUBLIC_SUPABASE_URL ||
   process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder");
@@ -78,6 +79,13 @@ export default async function DashboardPage() {
     .eq("family_id", family?.id)
     .order("created_at", { ascending: true });
 
+  // Has this household ever put anything on the calendar? The list above is
+  // only the next five upcoming, so it can't answer that on its own.
+  const { count: eventCount } = await supabase
+    .from("events")
+    .select("id", { count: "exact", head: true })
+    .eq("family_id", family?.id);
+
   return (
     <div className="flex flex-col lg:flex-row h-full min-h-[calc(100vh-56px)] lg:min-h-screen">
       <div className="flex-1 flex flex-col min-h-[60vh] lg:min-h-0">
@@ -96,6 +104,14 @@ export default async function DashboardPage() {
             <p className="text-sm text-text-secondary mt-1">What can Kin help with today?</p>
           </div>
         </div>
+        <div className="px-5 pt-4">
+          <SetupChecklist
+            familyName={family?.name}
+            memberCount={(familyMembers ?? []).length}
+            eventCount={eventCount ?? 0}
+          />
+        </div>
+
         <div className="flex-1 overflow-hidden">
           <ChatInterface
             familyId={family?.id}
