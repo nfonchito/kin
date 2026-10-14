@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import Image from "next/image";
 import { KinLogo } from "@/components/KinLogo";
 import { MessageSquareText, CalendarDays, BellRing, Home, ArrowRight } from "lucide-react";
 
@@ -136,6 +137,37 @@ export default function HomePage() {
               </div>
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* The actual product. Signing up used to mean handing over an email and
+          a password having seen nothing but a mocked chat bubble. */}
+      <section className="mx-auto max-w-6xl px-6 lg:px-10 pb-4 w-full">
+        <div className="max-w-xl mb-8">
+          <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-text-muted mb-4">
+            What you get
+          </p>
+          <h2 className="font-display text-4xl sm:text-5xl leading-[1.05] tracking-[-0.02em] text-text-primary">
+            One calendar, filled in by typing.
+          </h2>
+          <p className="mt-5 text-[15px] text-text-secondary leading-relaxed">
+            Everything you tell Kin lands here — one-offs, appointments, and
+            standing arrangements like the lawn on a Thursday.
+          </p>
+        </div>
+
+        {/* Capped below the container width: the source is 1200px, so a
+            narrower slot keeps it crisp on a dense display. */}
+        <div className="max-w-5xl rounded-2xl border border-border overflow-hidden shadow-card bg-surface">
+          <Image
+            src="/calendar-preview.png"
+            alt="Kin's calendar for October, showing a dentist appointment, soccer practice, a parent-teacher evening, a car service, and lawn care repeating every Thursday."
+            width={1200}
+            height={529}
+            className="w-full h-auto"
+            priority
+            sizes="(max-width: 1024px) 100vw, 1024px"
+          />
         </div>
       </section>
 
