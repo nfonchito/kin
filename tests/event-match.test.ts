@@ -1,6 +1,6 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { extractSubject, findMatches, wantsWholeSeries } from "../lib/event-match.ts";
+import { extractSubject, findMatches, wantsWholeSeries, splitSubjects, clearWholeDay } from "../lib/event-match.ts";
 
 const events = [
   { id: "1", title: "Dentist — Maya", start_time: "2026-11-13T20:00:00Z" },
@@ -77,5 +77,51 @@ describe("wantsWholeSeries", () => {
   test("a plain cancel means one occurrence", () => {
     assert.equal(wantsWholeSeries("cancel the lawn care"), false);
     assert.equal(wantsWholeSeries("cancel the dentist on friday"), false);
+  });
+});
+
+describe("splitSubjects", () => {
+  test("splits several things named in one breath", () => {
+    assert.deepEqual(splitSubjects("cancel soccer and dentist"), ["soccer", "dentist"]);
+    assert.deepEqual(splitSubjects("cancel the soccer, the dentist and the vet"), ["soccer", "dentist", "vet"]);
+  });
+
+  test("a single subject comes back as one", () => {
+    assert.deepEqual(splitSubjects("cancel the dentist"), ["dentist"]);
+  });
+
+  test("drops empty fragments rather than matching everything", () => {
+    assert.deepEqual(splitSubjects("cancel it and that"), []);
+  });
+});
+
+describe("clearWholeDay", () => {
+  const TZ = 360;
+  const realNow = Date.now;
+  const freeze = () => { Date.now = () => Date.parse("2026-11-11T15:00:00Z"); };  // Wed
+
+  test("recognises a sweep with a day", () => {
+    freeze();
+    try {
+      for (const m of ["cancel everything tomorrow", "clear friday", "cancel all my events today"]) {
+        assert.ok(clearWholeDay(m, TZ), m + " should sweep");
+      }
+    } finally { Date.now = realNow; }
+  });
+
+  test("refuses to sweep when no day is given — too blunt to act on", () => {
+    freeze();
+    try {
+      assert.equal(clearWholeDay("cancel everything", TZ), null);
+      assert.equal(clearWholeDay("clear it", TZ), null);
+    } finally { Date.now = realNow; }
+  });
+
+  test("a single named cancellation is not a sweep", () => {
+    freeze();
+    try {
+      assert.equal(clearWholeDay("cancel the dentist on friday", TZ), null);
+      assert.equal(clearWholeDay("cancel soccer tomorrow", TZ), null);
+    } finally { Date.now = realNow; }
   });
 });

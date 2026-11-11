@@ -1,4 +1,4 @@
-import { normalizeDays, TOMORROW_RE, TODAY_RE } from "./dates.ts";
+import { normalizeDays, TOMORROW_RE, TODAY_RE, hasDateLike, calendarWindow } from "./dates.ts";
 
 /** Words that say what to do, never what it is about. */
 const COMMANDS =
@@ -77,4 +77,35 @@ export function findMatches<T extends MatchableEvent>(events: T[], subject: stri
     .filter((s) => s.hits === best)
     .map((s) => s.event)
     .sort((a, b) => a.start_time.localeCompare(b.start_time));
+}
+
+/**
+ * A "clear my Friday" request: a span of time, with nothing named inside it.
+ *
+ * Returns null unless the message both sweeps ("everything", "clear") and says
+ * when — "cancel everything" with no day is too blunt an instruction to act on.
+ */
+export function clearWholeDay(
+  message: string,
+  tzOffsetMin: number
+): { startISO: string; endISO: string; phrase: string } | null {
+  const sweeping =
+    /\b(everything|anything|all (my |the )?(events?|plans?|appointments?)|the (whole|entire) day|my (whole |entire )?(day|week))\b/i.test(message) ||
+    /^\s*clear\b/i.test(message);
+  if (!sweeping) return null;
+
+  const saysWhen =
+    hasDateLike(message, tzOffsetMin) || /\b(today|tomorrow|week|weekend|month)\b/i.test(message);
+  if (!saysWhen) return null;
+
+  const win = calendarWindow(message, tzOffsetMin);
+  return { startISO: win.startISO, endISO: win.endISO, phrase: win.label };
+}
+
+/** "cancel soccer and the dentist" → ["soccer", "dentist"]. */
+export function splitSubjects(message: string): string[] {
+  return message
+    .split(/\s*(?:,|\band\b|\bplus\b|&)\s*/i)
+    .map((part) => extractSubject(part))
+    .filter((part) => part.length > 0);
 }

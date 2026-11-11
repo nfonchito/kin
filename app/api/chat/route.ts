@@ -4,7 +4,8 @@ import { sendTaskNotification } from "@/lib/email";
 import { generateSmartReply } from "@/lib/ai";
 import { rateLimit } from "@/lib/ratelimit";
 import { formatCalendarAnswer } from "@/lib/calendar-answer";
-import { extractSubject, findMatches, wantsWholeSeries } from "@/lib/event-match";
+import { extractSubject, findMatches, wantsWholeSeries, splitSubjects, clearWholeDay } from "@/lib/event-match";
+import { normalizeCommands } from "@/lib/typos";
 import {
   TOMORROW_RE,
   TODAY_RE,
@@ -100,7 +101,10 @@ function extractEventTitle(msg: string): string {
     .replace(/\s+/g, " ")
     .replace(/\b(book|get)X(club|fair|together)\b/gi, (_m, a, b) => `${a} ${b}`)
     .trim();
-  return cleaned || msg.slice(0, 60);
+  const title = cleaned || msg.slice(0, 60);
+  // A calendar of lower-case entries reads as unfinished, and the reply quotes
+  // the title straight back — "soccer" looked careless beside "Lawn care".
+  return title.charAt(0).toUpperCase() + title.slice(1);
 }
 
 function inferCalCategory(title: string): string {
@@ -199,6 +203,72 @@ function pendingMoveSubject(history: Message[]): string | null {
   return null;
 }
 
+// ─── Cancelling several things at once ────────────────────────────────────────
+
+/**
+ * Removes a set of events, asking first.
+ *
+ * Deleting one thing by name is unambiguous. Deleting several at once is the
+ * kind of thing you only want to do on purpose, and there is no undo — so the
+ * first turn lists what would go and the confirmation does it.
+ */
+async function confirmOrCancelMany(
+  supabase: DbClient,
+  familyId: string,
+  events: { id: string; title: string; start_time: string }[],
+  confirmed: boolean,
+  what: string,
+  tzOffsetMin: number
+): Promise<string> {
+  const when = (iso: string) => formatEventLine(iso, tzOffsetMin, { withDate: true });
+
+  if (!confirmed) {
+    const lines = events.slice(0, 8).map((e) => `• ${when(e.start_time)} — ${e.title}`);
+    const hidden = events.length - lines.length;
+    const more = hidden > 0 ? `\n…and ${hidden} more.` : "";
+    const noun = events.length === 1 ? "thing" : "things";
+    const them = events.length === 1 ? "it" : "them all";
+    return (
+      `That's ${events.length} ${noun} — ${what}:\n` +
+      lines.join("\n") +
+      more +
+      `\nCancel ${them}? Say yes and they're gone.`
+    );
+  }
+
+  const { error } = await supabase
+    .from("events")
+    .delete()
+    .in("id", events.map((e) => e.id))
+    .eq("family_id", familyId);
+
+  if (error) {
+    console.error("[chat] bulk cancel failed:", error.message);
+    return "I couldn't remove those just then — they're all still on your calendar. Try again in a moment?";
+  }
+  return `Done — cancelled ${events.length} ${events.length === 1 ? "thing" : "things"}.`;
+}
+
+/**
+ * The cancel request Kin just asked about, if the last thing it said was the
+ * confirmation question. Lets "yes" finish what the previous message started.
+ */
+function pendingBulkCancel(history: Message[]): string | null {
+  for (let i = history.length - 1; i >= 0; i--) {
+    const m = history[i];
+    if (m.role === "user") return null;
+    if (/Cancel (it|them all)? Say yes and they're gone./.test(m.content)) {
+      // The request itself is the user message just before this one.
+      for (let j = i - 1; j >= 0; j--) {
+        if (history[j].role === "user") return history[j].content;
+      }
+      return null;
+    }
+    return null;
+  }
+  return null;
+}
+
 // ─── Acting on an existing event ──────────────────────────────────────────────
 
 type DbClient = Awaited<ReturnType<typeof createClient>>;
@@ -217,10 +287,14 @@ async function changeExistingEvent(
   message: string,
   intent: "cancel" | "reschedule",
   tzOffsetMin: number,
-  timeZone: string | null
+  timeZone: string | null,
+  /** True when this is the user confirming a bulk cancel Kin asked about. */
+  confirmed = false
 ): Promise<string> {
   const subject = extractSubject(message);
-  if (!subject) {
+  const sweep = intent === "cancel" ? clearWholeDay(message, tzOffsetMin) : null;
+
+  if (!subject && !sweep) {
     return intent === "cancel"
       ? "Happy to cancel it — which one? Name it the way it's on the calendar, like \"cancel the dentist\"."
       : "Which one should I move, and to when? Something like \"move soccer to Friday\".";
@@ -238,6 +312,33 @@ async function changeExistingEvent(
   if (error) {
     console.error("[chat] change lookup failed:", error.message);
     return "I couldn't reach your calendar just then. Try me again in a moment?";
+  }
+
+  // "clear friday" / "cancel everything tomorrow" — a whole span rather than
+  // one named thing.
+  if (sweep) {
+    const inSpan = (upcoming ?? []).filter(
+      (e) => e.start_time >= sweep.startISO && e.start_time <= sweep.endISO
+    );
+    if (inSpan.length === 0) {
+      return `There's nothing on your calendar ${sweep.phrase} to cancel.`;
+    }
+    return confirmOrCancelMany(supabase, familyId, inSpan, confirmed, `everything ${sweep.phrase}`, tzOffsetMin);
+  }
+
+  // "cancel soccer and dentist" — several named things at once.
+  const parts = splitSubjects(message);
+  if (intent === "cancel" && parts.length > 1) {
+    const hits = parts.flatMap((part) => findMatches(upcoming ?? [], part));
+    const unique = [...new Map(hits.map((e) => [e.id, e])).values()];
+    const missed = parts.filter((part) => findMatches(upcoming ?? [], part).length === 0);
+
+    if (unique.length === 0) {
+      return `I couldn't find any of those coming up — ${parts.join(", ")}.`;
+    }
+    const note = missed.length ? ` I couldn't find ${missed.join(" or ")}, so ${missed.length === 1 ? "that one is" : "those are"} untouched.` : "";
+    const result = await confirmOrCancelMany(supabase, familyId, unique, confirmed, parts.join(" and "), tzOffsetMin);
+    return result + note;
   }
 
   const matches = findMatches(upcoming ?? [], subject);
@@ -747,8 +848,20 @@ function generateResponse(
     case "add_to_calendar": {
       const title = extractEventTitle(msg);
       const forWhom = person && !title.toLowerCase().includes(person.toLowerCase()) ? ` for ${person}` : "";
+      // Say the time back. Kin picks one when the message only implies it
+      // ("tmmr 5" → 5pm, no time at all → 9am), and a confirmation that hides
+      // the choice is how you find out it guessed wrong a day too late.
+      const whenHasTime = !!when && /\d{1,2}:\d{2}|\b(AM|PM)\b/i.test(when);
+      const clock = !whenHasTime && (hasExplicitTime(msg) || /\b\d{1,2}(:\d{2})?\s*$/.test(msg.trim()))
+        ? ` at ${extractTime(msg).replace(/^(\d{2}):(\d{2})$/, (_m, h, mi) => {
+            const hour = parseInt(h);
+            const suffix = hour >= 12 ? "PM" : "AM";
+            const twelve = hour % 12 === 0 ? 12 : hour % 12;
+            return `${twelve}:${mi} ${suffix}`;
+          })}`
+        : "";
       return {
-        reply: `Got it — I've got "${title}"${forWhom}${when ? ` down for ${when}` : ""}.`,
+        reply: `Got it — I've got "${title}"${forWhom}${when ? ` down for ${when}` : ""}${clock}.`,
         activity: { title, category: "general", status: "done" },
       };
     }
@@ -848,6 +961,12 @@ export async function POST(req: NextRequest) {
   // reachable on a deployment that has no Supabase configured. Otherwise
   // anyone could POST familyId:"preview" and use the endpoint unauthenticated
   // (which also means triggering email, and billing once a model key is set).
+  // Misspelled instructions are repaired before intent is decided: "remvoe
+  // the lawn care" used to add lawn care, and "cancle the dentist" offered to
+  // book a second one. The message stored and echoed back stays exactly as
+  // typed; this corrected copy is only used to work out what was meant.
+  const instruction = normalizeCommands(message);
+
   if (familyId === "preview") {
     if (!IS_PREVIEW_DEPLOYMENT) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -861,9 +980,9 @@ export async function POST(req: NextRequest) {
       members: Array.isArray(provided.members) ? provided.members : [],
       preferences: null,
     };
-    const intent = detectIntent(message, [], tz);
-    const { reply, activity } = generateResponse(intent, message, ctx, tz);
-    const series = activity ? buildEventSeries(activity, message, tz, zone) : [];
+    const intent = detectIntent(instruction, [], tz);
+    const { reply, activity } = generateResponse(intent, instruction, ctx, tz);
+    const series = activity ? buildEventSeries(activity, instruction, tz, zone) : [];
     const calEvent = series[0] ?? null;
 
     // Use Claude for the reply when an API key is configured; otherwise fall back.
@@ -953,17 +1072,20 @@ export async function POST(req: NextRequest) {
   // normal reschedule path handle it, subject and all.
   const pending = pendingMoveSubject(history);
   const answeringMove =
-    pending !== null && (hasDateLike(message, tz) || hasExplicitTime(message) || /\b\d{1,2}\b/.test(message));
+    pending !== null &&
+    (hasDateLike(instruction, tz) || hasExplicitTime(instruction) || /\b\d{1,2}\b/.test(instruction));
 
-  const effectiveMessage = answeringMove ? `move ${pending} to ${message.replace(/^\s*to\s+/i, "")}` : message;
-  const intent = answeringMove ? "reschedule" : detectIntent(message, history, tz);
+  const effectiveMessage = answeringMove
+    ? `move ${pending} to ${instruction.replace(/^\s*to\s+/i, "")}`
+    : instruction;
+  const intent = answeringMove ? "reschedule" : detectIntent(instruction, history, tz);
 
   // Calendar questions get answered from the real rows. This used to deflect
   // to "your schedule lives on the Calendar tab", which is the moment the
   // product stops looking like an assistant.
   let calendarReply: string | null = null;
   if (intent === "calendar_query") {
-    const win = calendarWindow(message, tz);
+    const win = calendarWindow(instruction, tz);
     const { data: windowEvents, error: windowError } = await supabase
       .from("events")
       .select("title, start_time, category")
@@ -979,7 +1101,7 @@ export async function POST(req: NextRequest) {
       // "what does Maya have this week" means Maya's entries, not everyone's.
       const named = ctx.members
         .map((m) => m.name)
-        .find((n) => n && new RegExp(`\\b${n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(message));
+        .find((n) => n && new RegExp(`\\b${n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(instruction));
       const rows = named
         ? (windowEvents ?? []).filter((e) => e.title.toLowerCase().includes(named.toLowerCase()))
         : (windowEvents ?? []);
@@ -995,8 +1117,15 @@ export async function POST(req: NextRequest) {
     calendarReply = await changeExistingEvent(supabase, familyId, effectiveMessage, intent, tz, zone);
   }
 
-  const { reply, activity } = generateResponse(intent, message, ctx, tz);
-  const series = activity ? buildEventSeries(activity, message, tz, zone) : [];
+  // "yes" to a bulk cancel Kin just asked about: re-run the original request,
+  // this time for real.
+  const confirming = intent === "affirmation" ? pendingBulkCancel(history) : null;
+  if (!calendarReply && confirming) {
+    calendarReply = await changeExistingEvent(supabase, familyId, normalizeCommands(confirming), "cancel", tz, zone, true);
+  }
+
+  const { reply, activity } = generateResponse(intent, instruction, ctx, tz);
+  const series = activity ? buildEventSeries(activity, instruction, tz, zone) : [];
 
   // Save the calendar rows BEFORE composing the reply, so the confirmation
   // only ever claims what actually persisted.
