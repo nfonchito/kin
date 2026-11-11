@@ -11,6 +11,7 @@ import {
   localPartsIn,
   hasDateLike,
   extractTime,
+  normalizeDays,
 } from "../lib/dates.ts";
 
 // US Central: getTimezoneOffset() reports +300 while on daylight time.
@@ -237,5 +238,40 @@ describe("extractTime", () => {
 
   test("falls back to 9am when no time is given", () => {
     assert.equal(extractTime("lawn care thursday"), "09:00");
+  });
+});
+
+describe("normalizeDays", () => {
+  test("repairs weekday typos the explicit table never listed", () => {
+    // A real user typed "wndsday"; an enumerated list is always one typo behind.
+    assert.match(normalizeDays("next wndsday"), /wednesday/);
+    assert.match(normalizeDays("move it to wendsday"), /wednesday/);
+    assert.match(normalizeDays("tuesdya at 4"), /tuesday/);
+    assert.match(normalizeDays("thrusday"), /thursday/);
+    assert.match(normalizeDays("saterday"), /saturday/);
+  });
+
+  test("leaves ordinary words alone", () => {
+    for (const word of ["money", "someday", "birthday", "holiday", "yesterday", "monthly", "swimming", "sundries"]) {
+      const out = normalizeDays(word);
+      assert.equal(out, word, `"${word}" should survive untouched, got "${out}"`);
+    }
+  });
+
+  test("a correct weekday is untouched", () => {
+    assert.equal(normalizeDays("wednesday"), "wednesday");
+    assert.equal(normalizeDays("every Thursday"), "every Thursday");
+  });
+});
+
+describe("a bare trailing time", () => {
+  test("is read as the hour — 'soccer practice tmmr 5'", () => {
+    assert.equal(extractTime("soccer practice tmmr 5"), "17:00");
+    assert.equal(extractTime("dentist friday 2"), "14:00");
+    assert.equal(extractTime("gym monday 6:30"), "18:30");
+  });
+
+  test("does not invent a time when there is no number", () => {
+    assert.equal(extractTime("soccer practice tomorrow"), "09:00");
   });
 });

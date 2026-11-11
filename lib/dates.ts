@@ -24,10 +24,61 @@ const DAY_TYPOS: [RegExp, string][] = [
   [/\b(sundey|sundy)\b/gi, "sunday"],
 ];
 
+const WEEKDAYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+
+/** Ordinary words ending in "day" that the matcher below would otherwise
+ *  mistake for a misspelled weekday — "someday" is three edits from "sunday". */
+const NOT_A_WEEKDAY = new Set([
+  "someday", "everyday", "holiday", "birthday", "yesterday", "workday",
+  "weekday", "weekdays", "payday", "midday", "nowadays", "doomsday", "mayday",
+]);
+
+/** Levenshtein distance, stopping early once it exceeds `max`. */
+function editDistance(a: string, b: string, max: number): number {
+  if (Math.abs(a.length - b.length) > max) return max + 1;
+  let prev = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    const row = [i];
+    let best = i;
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      row[j] = Math.min(prev[j] + 1, row[j - 1] + 1, prev[j - 1] + cost);
+      best = Math.min(best, row[j]);
+    }
+    if (best > max) return max + 1;
+    prev = row;
+  }
+  return prev[b.length];
+}
+
+/**
+ * Repairs misspelled weekdays.
+ *
+ * The explicit table above catches the common ones cheaply; anything else is
+ * matched by edit distance, because an enumerated list is always one typo
+ * behind — a real user wrote "wndsday" and it sailed straight through.
+ *
+ * Guarded to avoid mangling ordinary words: a candidate must be at least six
+ * characters, start with the same letter, and be within two edits. That keeps
+ * "money" from becoming "monday".
+ */
 export function normalizeDays(s: string): string {
   let out = s;
   for (const [re, fix] of DAY_TYPOS) out = out.replace(re, fix);
-  return out;
+
+  return out.replace(/\b[a-z]{6,10}\b/gi, (word) => {
+    const lower = word.toLowerCase();
+    if (WEEKDAYS.includes(lower) || NOT_A_WEEKDAY.has(lower)) return word;
+
+    // A misspelling that still ends in "day" is almost certainly a weekday, so
+    // it earns one more edit of slack — "wndsday" is three from "wednesday".
+    const budget = lower.endsWith("day") ? 3 : 2;
+    for (const day of WEEKDAYS) {
+      if (day[0] !== lower[0]) continue;
+      if (editDistance(lower, day, budget) <= budget) return day;
+    }
+    return word;
+  });
 }
 
 const MONTHS_ABBR = ["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"];
@@ -59,9 +110,12 @@ export function extractTime(msg: string): string {
     return `${String(h).padStart(2, "0")}:${String(min).padStart(2, "0")}`;
   }
 
-  // A bare clock time — "soccer at 4", "book club at 7:30". Without this the
-  // hour was dropped entirely and the event landed at the 9am default.
-  const bare = msg.match(/\b(?:at|from|around)\s+(\d{1,2})(?::(\d{2}))?\b(?!\s*(?:am|pm))/i);
+  // A bare clock time. Either introduced — "soccer at 4" — or just trailing,
+  // which is how people actually type: a real user sent "soccer practice tmmr
+  // 5" and got a 9am event titled "soccer practice 5".
+  const bare =
+    msg.match(/\b(?:at|from|around)\s+(\d{1,2})(?::(\d{2}))?\b(?!\s*(?:am|pm))/i) ||
+    msg.match(/(?:^|\s)(\d{1,2})(?::(\d{2}))?\s*$/);
   if (bare) {
     let h = parseInt(bare[1]);
     const min = bare[2] ? parseInt(bare[2]) : 0;

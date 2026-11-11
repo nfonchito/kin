@@ -179,6 +179,26 @@ function buildEventSeries(
   }));
 }
 
+// ─── Carrying a question over to the next message ─────────────────────────────
+
+/**
+ * The event Kin just asked "when to?" about, if the last thing it said was
+ * that question.
+ *
+ * Without this, answering a question Kin asked is read as a brand new
+ * request: a real user replied "to next wendsday at 5 pm" and got an event
+ * titled exactly that. A conversation has to remember what it just asked.
+ */
+function pendingMoveSubject(history: Message[]): string | null {
+  for (let i = history.length - 1; i >= 0; i--) {
+    const m = history[i];
+    if (m.role === "user") return null;          // the user moved on
+    const asked = m.content.match(/Happy to move "([^"]+)" — when to\?/);
+    if (asked) return asked[1];
+  }
+  return null;
+}
+
 // ─── Acting on an existing event ──────────────────────────────────────────────
 
 type DbClient = Awaited<ReturnType<typeof createClient>>;
@@ -269,7 +289,10 @@ async function changeExistingEvent(
   }
 
   if (!next) {
-    return `Happy to move ${target.title} — when to? Give me a day or a time and I'll shift it.`;
+    // The title is quoted so the next turn can pick it back up — see
+    // pendingMoveSubject. Without that, answering this question created a new
+    // event called "to next wednesday at 5 pm".
+    return `Happy to move "${target.title}" — when to? Give me a day or a time and I'll shift it.`;
   }
 
   const { error: upError } = await supabase
@@ -350,6 +373,8 @@ function stripWhen(s: string): string {
     // A bare clock time — "at 5", "at 5:30". Without this the number survived
     // into the title: "soccer practice tomorrow at 5" became "soccer practice 5".
     .replace(/\b(?:at|from|around|about)\s+\d{1,2}(?::\d{2})?\b/gi, "")
+    // ...and a bare one left at the end: "soccer practice tmmr 5".
+    .replace(/(?:^|\s)\d{1,2}(?::\d{2})?\s*$/, "")
     .replace(/\b(noon|midnight)\b/gi, "")
     .replace(/\b(on|at|for)\s*$/i, "")
     // Punctuation left stranded by the removals above.
@@ -921,8 +946,17 @@ export async function POST(req: NextRequest) {
     content: message,
   });
 
-  // Generate response
-  const intent = detectIntent(message, history, tz);
+  // Generate response.
+  //
+  // If Kin just asked which day to move something to, this message is the
+  // answer — not a new request. Rewriting it into a full instruction lets the
+  // normal reschedule path handle it, subject and all.
+  const pending = pendingMoveSubject(history);
+  const answeringMove =
+    pending !== null && (hasDateLike(message, tz) || hasExplicitTime(message) || /\b\d{1,2}\b/.test(message));
+
+  const effectiveMessage = answeringMove ? `move ${pending} to ${message.replace(/^\s*to\s+/i, "")}` : message;
+  const intent = answeringMove ? "reschedule" : detectIntent(message, history, tz);
 
   // Calendar questions get answered from the real rows. This used to deflect
   // to "your schedule lives on the Calendar tab", which is the moment the
@@ -958,7 +992,7 @@ export async function POST(req: NextRequest) {
   // appointment to next week" fell through and created a second vet
   // appointment. Both now act on the row the message refers to.
   if (!calendarReply && (intent === "cancel" || intent === "reschedule")) {
-    calendarReply = await changeExistingEvent(supabase, familyId, message, intent, tz, zone);
+    calendarReply = await changeExistingEvent(supabase, familyId, effectiveMessage, intent, tz, zone);
   }
 
   const { reply, activity } = generateResponse(intent, message, ctx, tz);
