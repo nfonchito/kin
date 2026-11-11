@@ -51,12 +51,30 @@ export function extractTime(msg: string): string {
   if (/\bnoon\b/.test(lower)) return "12:00";
   if (/\bmidnight\b/.test(lower)) return "00:00";
   const m = msg.match(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/i);
-  if (!m) return "09:00";
-  let h = parseInt(m[1]);
-  const min = m[2] ? parseInt(m[2]) : 0;
-  if (m[3].toLowerCase() === "pm" && h !== 12) h += 12;
-  if (m[3].toLowerCase() === "am" && h === 12) h = 0;
-  return `${String(h).padStart(2, "0")}:${String(min).padStart(2, "0")}`;
+  if (m) {
+    let h = parseInt(m[1]);
+    const min = m[2] ? parseInt(m[2]) : 0;
+    if (m[3].toLowerCase() === "pm" && h !== 12) h += 12;
+    if (m[3].toLowerCase() === "am" && h === 12) h = 0;
+    return `${String(h).padStart(2, "0")}:${String(min).padStart(2, "0")}`;
+  }
+
+  // A bare clock time — "soccer at 4", "book club at 7:30". Without this the
+  // hour was dropped entirely and the event landed at the 9am default.
+  const bare = msg.match(/\b(?:at|from|around)\s+(\d{1,2})(?::(\d{2}))?\b(?!\s*(?:am|pm))/i);
+  if (bare) {
+    let h = parseInt(bare[1]);
+    const min = bare[2] ? parseInt(bare[2]) : 0;
+    if (h >= 1 && h <= 24) {
+      // "at 4" means the afternoon. Hours from 7 up are left as written, since
+      // "at 8" is as likely to be the school run as the evening.
+      if (h >= 1 && h <= 6) h += 12;
+      if (h === 24) h = 0;
+      return `${String(h % 24).padStart(2, "0")}:${String(min).padStart(2, "0")}`;
+    }
+  }
+
+  return "09:00";
 }
 
 // A Date whose getUTC* fields read as the user's local wall clock.

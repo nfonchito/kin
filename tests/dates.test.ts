@@ -10,6 +10,7 @@ import {
   localDayDelta,
   localPartsIn,
   hasDateLike,
+  extractTime,
 } from "../lib/dates.ts";
 
 // US Central: getTimezoneOffset() reports +300 while on daylight time.
@@ -212,5 +213,29 @@ describe("localDayDelta", () => {
     const p = localPartsIn("2026-10-13T19:00:00Z", ZONE);
     assert.equal(p.hour, 14);
     assert.equal(p.day, 13);
+  });
+});
+
+describe("extractTime", () => {
+  test("explicit am/pm is taken literally", () => {
+    assert.equal(extractTime("dentist at 2pm"), "14:00");
+    assert.equal(extractTime("gym at 6am"), "06:00");
+    assert.equal(extractTime("call at 7:30pm"), "19:30");
+    assert.equal(extractTime("lunch at noon"), "12:00");
+  });
+
+  test("a bare early hour means the afternoon — 'soccer at 4' is not 4am", () => {
+    assert.equal(extractTime("soccer at 4"), "16:00");
+    assert.equal(extractTime("pickup at 3:15"), "15:15");
+    assert.equal(extractTime("swimming at 5"), "17:00");
+  });
+
+  test("from 7 up a bare hour is left as written, since it splits both ways", () => {
+    assert.equal(extractTime("drop off at 8"), "08:00");
+    assert.equal(extractTime("book club at 7:30"), "07:30");
+  });
+
+  test("falls back to 9am when no time is given", () => {
+    assert.equal(extractTime("lawn care thursday"), "09:00");
   });
 });

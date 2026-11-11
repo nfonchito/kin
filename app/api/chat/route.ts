@@ -4,6 +4,7 @@ import { sendTaskNotification } from "@/lib/email";
 import { generateSmartReply } from "@/lib/ai";
 import { rateLimit } from "@/lib/ratelimit";
 import { formatCalendarAnswer } from "@/lib/calendar-answer";
+import { extractSubject, findMatches, wantsWholeSeries } from "@/lib/event-match";
 import {
   TOMORROW_RE,
   TODAY_RE,
@@ -17,6 +18,9 @@ import {
   expandOccurrences,
   calendarWindow,
   formatEventLine,
+  hasExplicitTime,
+  extractTime,
+  shiftPreservingLocalTime,
 } from "@/lib/dates";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -84,10 +88,17 @@ interface CalEvent {
 
 function extractEventTitle(msg: string): string {
   const cleaned = stripWhen(msg)
+    // "book" is a verb here except when it isn't: "book club at 7:30" was
+    // becoming "club". Closing the space removes the word boundary the
+    // stripper below matches on; the space is put back at the end.
+    .replace(/\bbook club\b/gi, "bookXclub")
+    .replace(/\bbook fair\b/gi, "bookXfair")
+    .replace(/\bget together\b/gi, "getXtogether")
     .replace(/\b(add|put|create|log|note|set up|set|book|schedule|make|need|want|get|find|please)\b/gi, " ")
     .replace(/\b(i|we|me|my|our|us|a|an|the|to|for|on|at|of|is|are|am|has|have|had|will|would|can|could|do|does)\b/gi, " ")
     .replace(/[.!?]+$/, "")
     .replace(/\s+/g, " ")
+    .replace(/\b(book|get)X(club|fair|together)\b/gi, (_m, a, b) => `${a} ${b}`)
     .trim();
   return cleaned || msg.slice(0, 60);
 }
@@ -131,10 +142,13 @@ function buildEventSeries(
 
   let first = buildCalendarEvent(activity, msg, tzOffsetMin);
 
-  // "every day" / "every month" name a cadence but no start date. Anchor the
-  // series to tomorrow, carrying over any time the message did mention.
+  // A cadence with no start date. "every Thursday" anchors to the next
+  // Thursday — anchoring it to tomorrow put "trash out tuesdays" on a
+  // Thursday. Anything without a weekday ("every day") still starts tomorrow.
   if (!first && recurrence) {
-    first = buildCalendarEvent(activity, `tomorrow ${msg}`, tzOffsetMin);
+    const named = recurrence.match(/^every (Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday)$/i);
+    const anchor = named ? named[1] : "tomorrow";
+    first = buildCalendarEvent(activity, `${anchor} ${msg}`, tzOffsetMin);
   }
 
   if (!first) return [];
@@ -165,6 +179,117 @@ function buildEventSeries(
   }));
 }
 
+// ─── Acting on an existing event ──────────────────────────────────────────────
+
+type DbClient = Awaited<ReturnType<typeof createClient>>;
+
+/**
+ * Cancels or moves the event a message refers to, and says what happened.
+ *
+ * Returns null when it should not answer at all, so the caller falls back to
+ * the normal reply. Everything else returns prose — including the failures,
+ * because "I couldn't find that" is a better answer than silently doing
+ * nothing or, as before, creating a duplicate.
+ */
+async function changeExistingEvent(
+  supabase: DbClient,
+  familyId: string,
+  message: string,
+  intent: "cancel" | "reschedule",
+  tzOffsetMin: number,
+  timeZone: string | null
+): Promise<string> {
+  const subject = extractSubject(message);
+  if (!subject) {
+    return intent === "cancel"
+      ? "Happy to cancel it — which one? Name it the way it's on the calendar, like \"cancel the dentist\"."
+      : "Which one should I move, and to when? Something like \"move soccer to Friday\".";
+  }
+
+  // Only ever touch what is still ahead; the past is a record.
+  const { data: upcoming, error } = await supabase
+    .from("events")
+    .select("*")
+    .eq("family_id", familyId)
+    .gte("start_time", new Date().toISOString())
+    .order("start_time", { ascending: true })
+    .limit(200);
+
+  if (error) {
+    console.error("[chat] change lookup failed:", error.message);
+    return "I couldn't reach your calendar just then. Try me again in a moment?";
+  }
+
+  const matches = findMatches(upcoming ?? [], subject);
+  if (matches.length === 0) {
+    return `I can't find anything coming up that matches "${subject}". The Calendar tab has everything if it's further out.`;
+  }
+
+  // Several unrelated things match — ask rather than pick.
+  const distinct = [...new Set(matches.map((m) => m.title.toLowerCase()))];
+  if (distinct.length > 1) {
+    const list = [...new Set(matches.map((m) => m.title))].slice(0, 4).join(", ");
+    return `I found a few that could be it — ${list}. Which one did you mean?`;
+  }
+
+  const target = matches[0];
+  const when = (iso: string) => formatEventLine(iso, tzOffsetMin, { withDate: true });
+
+  if (intent === "cancel") {
+    const wholeRun = target.recurrence_id && wantsWholeSeries(message);
+    const ids = wholeRun ? matches.map((m) => m.id) : [target.id];
+
+    const { error: delError } = await supabase
+      .from("events")
+      .delete()
+      .in("id", ids)
+      .eq("family_id", familyId);
+
+    if (delError) {
+      console.error("[chat] cancel failed:", delError.message);
+      return "I couldn't remove that just then — it's still on your calendar. Try again in a moment?";
+    }
+
+    if (wholeRun) {
+      return `Done — I've cancelled ${target.title}${target.recurrence_rule ? ` (${target.recurrence_rule})` : ""}, all ${ids.length} of them.`;
+    }
+    const rest = matches.length - 1;
+    return target.recurrence_id && rest > 0
+      ? `Done — ${target.title} on ${when(target.start_time)} is off. The other ${rest} in the run are still there; say "cancel all ${target.title.toLowerCase()}" to stop them too.`
+      : `Done — I've taken ${target.title} on ${when(target.start_time)} off your calendar.`;
+  }
+
+  // Reschedule: a new date, or just a new time on the same day.
+  const moved = extractDateISO(message, tzOffsetMin);
+  let next: string | null = moved;
+
+  if (!next && hasExplicitTime(message)) {
+    const t = extractTime(message).split(":").map(Number);
+    next = shiftPreservingLocalTime(target.start_time, 0, t[0], t[1], timeZone);
+  }
+
+  if (!next) {
+    return `Happy to move ${target.title} — when to? Give me a day or a time and I'll shift it.`;
+  }
+
+  const { error: upError } = await supabase
+    .from("events")
+    .update({ start_time: next })
+    .eq("id", target.id)
+    .eq("family_id", familyId);
+
+  if (upError) {
+    console.error("[chat] reschedule failed:", upError.message);
+    return `I couldn't move that just then — it's still at ${when(target.start_time)}. Try again in a moment?`;
+  }
+
+  const runNote =
+    target.recurrence_id && matches.length > 1
+      ? " That's just this one — the rest of the run is where it was."
+      : "";
+  return `Moved — ${target.title} is now ${when(next)}, was ${when(target.start_time)}.${runNote}`;
+}
+
 // ─── Entity extraction ──────────────────────────────────────────────────────────
 
 function cap(s: string): string {
@@ -176,6 +301,10 @@ function extractRecurrence(msg: string): string | null {
   const l = msg.toLowerCase();
   const wd = l.match(/\bevery\s+(sunday|monday|tuesday|wednesday|thursday|friday|saturday)s?\b/);
   if (wd) return `every ${cap(wd[1])}`;
+  // A bare plural weekday is how people say it out loud — "trash out tuesdays",
+  // "swimming tuesdays at 4" — and means the same as "every Tuesday".
+  const plural = l.match(/\b(sunday|monday|tuesday|wednesday|thursday|friday|saturday)s\b/);
+  if (plural) return `every ${cap(plural[1])}`;
   if (/\bevery weekday\b|\bweekdays\b/.test(l)) return "every weekday";
   if (/\bevery other week\b|\bbi-?weekly\b/.test(l)) return "every other week";
   if (/\bevery morning\b/.test(l)) return "every morning";
@@ -213,13 +342,20 @@ function stripWhen(s: string): string {
     .replace(/\bevery\s+(weekday|day|morning|evening|night|week|month|year)\b/gi, "")
     .replace(/\b(daily|weekly|monthly|yearly|annually|bi-?weekly|weekdays)\b/gi, "")
     .replace(/\b(next|this)\s+week\b/gi, "")
-    .replace(/\b(next\s+)?(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/gi, "")
+    .replace(/\b(next\s+)?(monday|tuesday|wednesday|thursday|friday|saturday|sunday)s?\b/gi, "")
     .replace(/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\.?\s+\d{1,2}(?:st|nd|rd|th)?\b/gi, "")
     .replace(/\b\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\b/g, "")
     .replace(/\b(?:the\s+)?\d{1,2}(?:st|nd|rd|th)\b/gi, "")
     .replace(/\b\d{1,2}(?::\d{2})?\s*(?:am|pm)\b/gi, "")
+    // A bare clock time — "at 5", "at 5:30". Without this the number survived
+    // into the title: "soccer practice tomorrow at 5" became "soccer practice 5".
+    .replace(/\b(?:at|from|around|about)\s+\d{1,2}(?::\d{2})?\b/gi, "")
     .replace(/\b(noon|midnight)\b/gi, "")
     .replace(/\b(on|at|for)\s*$/i, "")
+    // Punctuation left stranded by the removals above.
+    .replace(/\s*,\s*,+/g, ",")
+    .replace(/^[\s,;–—-]+|[\s,;–—-]+$/g, "")
+    .replace(/\s+,/g, ",")
     .replace(/\s+/g, " ").trim();
 }
 
@@ -306,7 +442,15 @@ function detectIntent(msg: string, history: Message[], tzOffsetMin = 0): string 
       (/\b(calendar|schedule|agenda)\b/.test(lower) &&
        /\b(show|see|view|open|check|list|pull up|read|what'?s|what is)\b/.test(lower)) ||
       /\b(what'?s|what is|anything)\b[^?]*\b(going on|happening|planned|scheduled|coming up|on tap|booked)\b/.test(lower) ||
-      /\b(what'?s|what is|what have i got|anything)\b[^?]*\b(today|tonight|tomorrow|this week|next week|this month|weekend|sunday|monday|tuesday|wednesday|thursday|friday|saturday)\b/.test(lower))
+      /\b(what'?s|what is|what have i got|anything)\b[^?]*\b(today|tonight|tomorrow|this week|next week|this month|weekend|sunday|monday|tuesday|wednesday|thursday|friday|saturday)\b/.test(lower) ||
+      // Questions about an existing entry. Without these, "when is Maya's
+      // dentist" was answered by offering to create one, and "is Tom free
+      // Friday" actually created an event called "Tom free".
+      /\bwhen (is|are|was|'?s)\b/.test(lower) ||
+      /\b(do|does|did)\s+\w+\s+have\b/.test(lower) ||
+      /\bwhat (does|do)\s+\w+\s+have\b/.test(lower) ||
+      /\b(is|are)\s+\w+\s+(free|busy|around|available)\b/.test(lower) ||
+      /\bhave i got\b/.test(lower))
     return "calendar_query";
 
   // Cancel / reschedule — before task matching so "cancel the dentist" isn't a new appointment
@@ -798,8 +942,23 @@ export async function POST(req: NextRequest) {
       console.error("[chat] calendar query failed:", windowError.message);
       calendarReply = "I couldn't reach your calendar just then — the Calendar tab will have it. Try me again in a moment?";
     } else {
-      calendarReply = formatCalendarAnswer(windowEvents ?? [], win, tz);
+      // "what does Maya have this week" means Maya's entries, not everyone's.
+      const named = ctx.members
+        .map((m) => m.name)
+        .find((n) => n && new RegExp(`\\b${n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(message));
+      const rows = named
+        ? (windowEvents ?? []).filter((e) => e.title.toLowerCase().includes(named.toLowerCase()))
+        : (windowEvents ?? []);
+      const label = named ? `${named}'s calendar — ${win.label}` : win.label;
+      calendarReply = formatCalendarAnswer(rows, { ...win, label }, tz);
     }
+  }
+
+  // Cancelling and moving used to point at the Calendar tab, and "push the vet
+  // appointment to next week" fell through and created a second vet
+  // appointment. Both now act on the row the message refers to.
+  if (!calendarReply && (intent === "cancel" || intent === "reschedule")) {
+    calendarReply = await changeExistingEvent(supabase, familyId, message, intent, tz, zone);
   }
 
   const { reply, activity } = generateResponse(intent, message, ctx, tz);
