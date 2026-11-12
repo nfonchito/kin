@@ -125,3 +125,28 @@ describe("clearWholeDay", () => {
     } finally { Date.now = realNow; }
   });
 });
+
+describe("findMatches tolerates a misspelled subject", () => {
+  test("finds the event the user meant", () => {
+    // A real user typed "cancel the dentest" and Kin found nothing.
+    assert.deepEqual(findMatches(events, "dentest").map((e) => e.id), ["1"]);
+    assert.deepEqual(findMatches(events, "socer").map((e) => e.id), ["2"]);
+    assert.deepEqual(findMatches(events, "practise").map((e) => e.id), ["2"]);
+    assert.deepEqual(findMatches(events, "lawn cear").map((e) => e.id), ["3", "4"]);
+  });
+
+  test("short words still have to be right", () => {
+    // "vet" is three letters; one edit of slack would match almost anything.
+    assert.deepEqual(findMatches(events, "vat"), []);
+    assert.deepEqual(findMatches(events, "net"), []);
+  });
+
+  test("an unrelated word still matches nothing", () => {
+    assert.deepEqual(findMatches(events, "piano"), []);
+    assert.deepEqual(findMatches(events, "swimming"), []);
+  });
+
+  test("an exact spelling still wins outright", () => {
+    assert.deepEqual(findMatches(events, "dentist").map((e) => e.id), ["1"]);
+  });
+});

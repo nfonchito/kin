@@ -1,4 +1,4 @@
-import { normalizeDays, TOMORROW_RE, TODAY_RE, hasDateLike, calendarWindow } from "./dates.ts";
+import { normalizeDays, TOMORROW_RE, TODAY_RE, hasDateLike, calendarWindow, editDistance } from "./dates.ts";
 
 /** Words that say what to do, never what it is about. */
 const COMMANDS =
@@ -63,7 +63,8 @@ export function findMatches<T extends MatchableEvent>(events: T[], subject: stri
   const scored = events
     .map((event) => {
       const title = event.title.toLowerCase();
-      const hits = words.filter((w) => title.includes(w)).length;
+      const titleWords = title.split(/[^a-z0-9']+/).filter(Boolean);
+      const hits = words.filter((w) => title.includes(w) || nearAnyWord(w, titleWords)).length;
       return { event, hits };
     })
     .filter((s) => s.hits > 0);
@@ -108,4 +109,22 @@ export function splitSubjects(message: string): string[] {
     .split(/\s*(?:,|\band\b|\bplus\b|&)\s*/i)
     .map((part) => extractSubject(part))
     .filter((part) => part.length > 0);
+}
+
+/**
+ * Whether a subject word is close enough to any word in a title.
+ *
+ * Instruction typos are repaired before this point, but the *subject* is
+ * whatever the family typed — a real user wrote "cancel the dentest" and Kin
+ * found nothing, because matching was exact. The budget scales with length so
+ * short words still have to be right: "vet" and "gym" have no room to spare,
+ * while "dentest" is one edit from "dentist".
+ */
+function nearAnyWord(word: string, titleWords: string[]): boolean {
+  const budget = word.length >= 8 ? 2 : word.length >= 5 ? 1 : 0;
+  if (budget === 0) return false;
+  return titleWords.some((t) => {
+    if (Math.abs(t.length - word.length) > budget) return false;
+    return editDistance(word, t, budget) <= budget;
+  });
 }
